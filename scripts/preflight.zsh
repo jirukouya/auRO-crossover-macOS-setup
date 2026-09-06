@@ -7,14 +7,15 @@ source "$SCRIPT_DIR/lib/crossover-common.zsh"
 BOTTLE_NAME="uaro-crossover"
 INSTALLER_DIR=""
 INSTALLER_ZIP=""
+RAWINPUT_SOURCE_DIR=""
 INSTALLER_CACHE_DIR="$HOME/Games/UaRO-Installer"
 MIN_FREE_GIB=15
 JSON_OUTPUT=0
 ALLOW_MISSING_INSTALLER=0
 
 usage() {
-  print "Usage: preflight.zsh --bottle NAME (--installer-dir DIR | --installer-zip ZIP) [--installer-cache-dir DIR] [--json]"
-  print "       preflight.zsh --bottle NAME --allow-missing-installer [--json]"
+  print "Usage: preflight.zsh --bottle NAME (--installer-dir DIR | --installer-zip ZIP) [--rawinput-source-dir DIR] [--installer-cache-dir DIR] [--json]"
+  print "       preflight.zsh --bottle NAME --allow-missing-installer [--rawinput-source-dir DIR] [--json]"
 }
 
 while (( $# )); do
@@ -22,6 +23,7 @@ while (( $# )); do
     --bottle) BOTTLE_NAME="$2"; shift 2 ;;
     --installer-dir) INSTALLER_DIR="$2"; shift 2 ;;
     --installer-zip) INSTALLER_ZIP="$2"; shift 2 ;;
+    --rawinput-source-dir) RAWINPUT_SOURCE_DIR="$2"; shift 2 ;;
     --installer-cache-dir) INSTALLER_CACHE_DIR="$2"; shift 2 ;;
     --min-free-gib) MIN_FREE_GIB="$2"; shift 2 ;;
     --json) JSON_OUTPUT=1; shift ;;
@@ -33,6 +35,7 @@ done
 
 [[ -z "$INSTALLER_DIR" || -z "$INSTALLER_ZIP" ]] || uo_die "--installer-dir and --installer-zip are mutually exclusive"
 INSTALLER_CACHE_DIR="${INSTALLER_CACHE_DIR:A}"
+RAWINPUT_SOURCE_DIR="${RAWINPUT_SOURCE_DIR:-}"
 
 uo_validate_bottle_name "$BOTTLE_NAME"
 uo_resolve_crossover
@@ -54,6 +57,8 @@ INSTALLER_STATUS="missing"
 INSTALLER_TYPE="none"
 INSTALLER_SOURCE=""
 INSTALLER_REPORT="{}"
+RAWINPUT_STATUS="not-supplied"
+RAWINPUT_REPORT="{}"
 
 if [[ -n "$INSTALLER_ZIP" ]]; then
   INSTALLER_ZIP="$(uo_realpath "$INSTALLER_ZIP")" || uo_die "installer ZIP does not exist: $INSTALLER_ZIP"
@@ -77,13 +82,24 @@ elif [[ -n "$INSTALLER_DIR" ]]; then
   fi
 fi
 
+if [[ -n "$RAWINPUT_SOURCE_DIR" ]]; then
+  RAWINPUT_SOURCE_DIR="$(uo_realpath "$RAWINPUT_SOURCE_DIR")" || uo_die "raw-input artifact source directory does not exist: $RAWINPUT_SOURCE_DIR"
+  if RAWINPUT_REPORT="$(python3 "$SCRIPT_DIR/artifact.py" inspect --source-dir "$RAWINPUT_SOURCE_DIR" --crossover-build "$CX_BUILD" --crossover-public-version "$CX_VERSION")"; then
+    RAWINPUT_STATUS="candidate"
+  else
+    RAWINPUT_STATUS="invalid"
+    RAWINPUT_REPORT="{}"
+    uo_warn "raw-input artifact source failed validation; preflight will remain blocked"
+  fi
+fi
+
 if [[ "$INSTALLER_STATUS" != "complete" && ! $ALLOW_MISSING_INSTALLER ]]; then
   uo_warn "installer preflight is not complete; supply the exact three installer members or use --allow-missing-installer for host-only inspection"
 fi
 
 if (( JSON_OUTPUT )); then
   python3 - "$BOTTLE_NAME" "$BOTTLE_DIR" "$INSTALLER_SOURCE" "$INSTALLER_TYPE" "$INSTALLER_STATUS" \
-    "$INSTALLER_CACHE_DIR" "$CX_APP" "$CX_VERSION" "$CX_BUILD" "$HOST_ARCH" "$FREE_GIB" "$INSTALLER_REPORT" <<'PY'
+    "$INSTALLER_CACHE_DIR" "$CX_APP" "$CX_VERSION" "$CX_BUILD" "$HOST_ARCH" "$FREE_GIB" "$INSTALLER_REPORT" "$RAWINPUT_SOURCE_DIR" "$RAWINPUT_STATUS" "$RAWINPUT_REPORT" <<'PY'
 import json
 import sys
 
@@ -100,11 +116,18 @@ import sys
     host_arch,
     free_gib,
     installer_report,
+    rawinput_source,
+    rawinput_status,
+    rawinput_report,
 ) = sys.argv[1:]
 try:
     report = json.loads(installer_report)
 except json.JSONDecodeError:
     report = None
+try:
+    rawinput = json.loads(rawinput_report)
+except json.JSONDecodeError:
+    rawinput = None
 print(json.dumps({
     "bottle": bottle,
     "bottle_dir": bottle_dir,
@@ -118,6 +141,9 @@ print(json.dumps({
     "crossover_build": cx_build,
     "host_arch": host_arch,
     "free_gib": int(free_gib),
+    "rawinput_source_dir": rawinput_source or None,
+    "rawinput_status": rawinput_status,
+    "rawinput": rawinput,
 }, indent=2, sort_keys=True))
 PY
 else
@@ -128,6 +154,7 @@ else
   uo_info "PASS: free space=${FREE_GIB}GiB"
   uo_info "INFO: bottle=$BOTTLE_NAME status=$BOTTLE_STATUS path=$BOTTLE_DIR"
   uo_info "INFO: installer=$INSTALLER_STATUS type=$INSTALLER_TYPE source=${INSTALLER_SOURCE:-not supplied}"
+  uo_info "INFO: raw-input artifact=${RAWINPUT_STATUS} source=${RAWINPUT_SOURCE_DIR:-not supplied}"
   if [[ "$INSTALLER_STATUS" == "complete" ]]; then
     python3 - "$INSTALLER_REPORT" <<'PY'
 import json
@@ -148,7 +175,14 @@ PY
   fi
 fi
 
-if [[ "$INSTALLER_STATUS" == "complete" || $ALLOW_MISSING_INSTALLER ]]; then
+PREFLIGHT_OK=1
+if [[ "$INSTALLER_STATUS" != "complete" && ! $ALLOW_MISSING_INSTALLER ]]; then
+  PREFLIGHT_OK=0
+fi
+if [[ "$RAWINPUT_STATUS" == "invalid" ]]; then
+  PREFLIGHT_OK=0
+fi
+if (( PREFLIGHT_OK )); then
   uo_write_state preflight pass
 else
   uo_write_state preflight blocked
@@ -172,9 +206,35 @@ print(json.dumps({
     "installer_status": status,
     "installer_report": report_value,
     "installer_stage": "pending" if status == "complete" else "blocked",
+    "installer": {
+        "zip": zip_path or None,
+        "sha256": (report_value or {}).get("archive_sha256") if isinstance(report_value, dict) else None,
+        "members": (report_value or {}).get("members", []) if isinstance(report_value, dict) else [],
+        "stage": "pending" if status == "complete" else "blocked",
+    },
 }))
 PY
 )"
 uo_state_merge_json "$PATCH_JSON"
 
-[[ "$INSTALLER_STATUS" == "complete" || $ALLOW_MISSING_INSTALLER ]] || exit 1
+RAWINPUT_STATE_JSON="$(python3 - "$RAWINPUT_SOURCE_DIR" "$RAWINPUT_STATUS" "$RAWINPUT_REPORT" <<'PY'
+import json
+import sys
+
+source, status, report = sys.argv[1:]
+try:
+    report_value = json.loads(report)
+except json.JSONDecodeError:
+    report_value = None
+print(json.dumps({
+    "raw_input": {
+        "artifact_dir": source or None,
+        "status": status,
+        "source_report": report_value,
+    }
+}))
+PY
+)"
+uo_state_merge_json "$RAWINPUT_STATE_JSON"
+
+(( PREFLIGHT_OK )) || exit 1

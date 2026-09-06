@@ -6,12 +6,35 @@ for script in "$ROOT"/scripts/*.zsh "$ROOT"/scripts/lib/*.zsh \
   "$ROOT"/scripts/preflight "$ROOT"/scripts/install "$ROOT"/scripts/patch-setup \
   "$ROOT"/scripts/configure-game "$ROOT"/scripts/build-overlay "$ROOT"/scripts/verify-overlay \
   "$ROOT"/scripts/build-launchers "$ROOT"/scripts/repair "$ROOT"/scripts/uninstall \
-  "$ROOT"/scripts/check-gecko "$ROOT"/scripts/verify-installer; do
+  "$ROOT"/scripts/check-gecko "$ROOT"/scripts/verify-installer "$ROOT"/scripts/artifact \
+  "$ROOT"/scripts/build-rawinput-artifact.zsh "$ROOT"/scripts/configure-keyboard.zsh \
+  "$ROOT"/scripts/verify-live-runtime.zsh "$ROOT"/scripts/diagnose.zsh; do
   zsh -n "$script"
 done
 
 if rg -n -i 'whisky|whiskyc?md|shellenv|wine64' "$ROOT/scripts"; then
   print -u2 -- "ERROR: CrossOver scripts contain a Whisky-specific dependency"
+  exit 1
+fi
+
+if rg -n '/Users/jax|/Users/[A-Za-z0-9._-]+/Downloads/gepard' "$ROOT/scripts"; then
+  print -u2 -- "ERROR: scripts contain another computer's absolute path"
+  exit 1
+fi
+
+if ! rg -q 'lib/perl|CXLog\.pm|lib64|mktemp|ret' "$ROOT/scripts/overlay.zsh" "$ROOT/scripts/artifact.py"; then
+  print -u2 -- "ERROR: overlay/artifact safeguards are missing"
+  exit 1
+fi
+
+if ! rg -q -- '--json|launch_path|vmmap|runtime_anchor' \
+  "$ROOT/scripts/verify-live-runtime.zsh" "$ROOT/scripts/build-launchers.zsh"; then
+  print -u2 -- "ERROR: live runtime route verification is missing"
+  exit 1
+fi
+
+if rg -n 'Game\.app' "$ROOT/scripts/build-launchers.zsh"; then
+  print -u2 -- "ERROR: the first launcher release must not generate Game.app"
   exit 1
 fi
 

@@ -1,0 +1,8 @@
+#!/bin/zsh
+set -euo pipefail
+SCRIPT_DIR="${0:A:h}"
+if [[ "${1:-}" == "import" ]]; then
+  shift
+  exec python3 "$SCRIPT_DIR/artifact.py" import "$@" --state-file "$HOME/Library/Application Support/uaRO-CrossOver/state.json"
+fi
+exec python3 "$SCRIPT_DIR/artifact.py" "$@"

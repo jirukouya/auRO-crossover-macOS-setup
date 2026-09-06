@@ -21,4 +21,5 @@ The tools are not assumed to be on PATH. The resolver derives both paths from th
 - Pass the bottle explicitly on every invocation.
 - Use `--cx-app` for Windows executables.
 - Use a per-bottle overlay only after the raw-input artifact contract has passed.
+- For registry-only keyboard mapping, stop the selected bottle's Wine server first, then use the resolved CrossOver `bin/wine --bottle ... --cx-app` wrapper to invoke `reg.exe`; do not assume `reg.exe` or `wineserver` is on PATH.
 - Do not use a different Wine manager's environment or metadata files.

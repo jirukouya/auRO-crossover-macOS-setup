@@ -4,9 +4,13 @@
 from __future__ import annotations
 
 import argparse
+import json
+import os
 import re
 import shutil
+import tempfile
 import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -17,6 +21,7 @@ def args() -> argparse.Namespace:
     parser.add_argument("--height", required=True, type=int)
     parser.add_argument("--device-id", default=None)
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--state-file", type=Path)
     return parser.parse_args()
 
 
@@ -36,6 +41,40 @@ def backup_once(path: Path) -> Path:
     if not backup.exists():
         shutil.copy2(path, backup)
     return backup
+
+
+def record_state(path: Path | None, game_dir: Path, width: int, height: int, device_id: str, backups: dict[str, Path]) -> None:
+    if path is None:
+        return
+    path = path.expanduser().resolve()
+    try:
+        state = json.loads(path.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError):
+        state = {}
+    state.setdefault("schema", 2)
+    state["updated_at"] = datetime.now(timezone.utc).isoformat()
+    state["phase"] = "config"
+    state["config"] = {
+        "game_dir": str(game_dir), "width": width, "height": height,
+        "device_id": device_id, "windowed": True,
+        "dinput_backup": str(backups["dinput"]), "option_info_backup": str(backups["option"]),
+        "status": "pass",
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, temporary = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".part", dir=path.parent)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            json.dump(state, handle, indent=2, sort_keys=True)
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+    except Exception:
+        try:
+            os.unlink(temporary)
+        except FileNotFoundError:
+            pass
+        raise
 
 
 def main() -> int:
@@ -104,6 +143,7 @@ def main() -> int:
     print(f"PASS: backups {dinput_backup} and {option_backup}")
     print(f"PASS: resolution={parsed.width}x{parsed.height} windowed=true")
     print("PASS: DX9DEVICENAME raw bytes verified")
+    record_state(parsed.state_file, game_dir, parsed.width, parsed.height, device_id, {"dinput": dinput_backup, "option": option_backup})
     return 0
 
 

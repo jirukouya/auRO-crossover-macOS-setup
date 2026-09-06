@@ -110,6 +110,13 @@ print(json.dumps({
     "installer_stage_dir": stage_dir,
     "installer_members": encoded,
     "installer_stage": "staged",
+    "installer": {
+        "zip": source_zip or None,
+        "sha256": archive_sha256 or None,
+        "members": encoded,
+        "cache": cache_zip or None,
+        "stage": "staged",
+    },
 }))
 PY
 )"
@@ -126,7 +133,7 @@ if (( RUN_INSTALLER )); then
   COMPLETION_JSON="$(python3 - "$GAME_DIR" <<'PY'
 import json
 import sys
-print(json.dumps({"installer_stage": "complete", "game_dir": sys.argv[1]}))
+print(json.dumps({"installer_stage": "complete", "game_dir": sys.argv[1], "installer": {"stage": "complete"}}))
 PY
 )"
   uo_state_merge_json "$COMPLETION_JSON"

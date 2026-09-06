@@ -2,10 +2,19 @@
 
 ## [Unreleased]
 
+- Implemented the 0.2.0 experimental artifact-import flow, schema-2 manifests, PE/source-patch validation, and a source-build fallback path.
+- Replaced byte-only OpenSetup patching with the hash-locked `gepard-crossover-26.3.0` profile; the older four-byte Site B variant is no longer production code.
+- Made raw-input probe exit status semantic, copied CrossOver `lib/perl`/optional `lib64`, anchored overlay `ntdll.so` to the local runtime, and made overlay creation atomic.
+- Kept community prebuilt DLLs outside Git and marked their provenance unconfirmed; no CrossOver app files, installer, savedata, or credentials are included.
 - Initial CrossOver-first repository and Skill skeleton.
 - Added CrossOver path/build discovery, bottle operations, installer staging, fail-closed OpenSetup patching, game configuration, overlay contracts, launcher validation, repair, rollback, and fixture tests.
 - Added exact three-member ZIP validation, non-iCloud installer caching, streaming staging, installer hash/member state, and a CrossOver Gecko check gate.
 - Deliberately excluded uaRO installers, credentials, savedata, and unverified Wine binaries.
+- Recorded the first local user-confirmed CrossOver end-to-end run and added a live runtime-route gate so a stock CrossOver shortcut cannot be mistaken for an overlay launch.
+
+## [0.2.0-experimental] - 2026-09-06
+
+- One local Patcher, login, and map-load run is user-confirmed; the release remains experimental because community DLL provenance and broader build compatibility are unconfirmed.
 
 ## [0.1.0-draft] - 2026-09-06
 

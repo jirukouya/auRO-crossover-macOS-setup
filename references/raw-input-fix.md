@@ -11,17 +11,18 @@ This repository does not claim that a binary is safe merely because it has that 
 
 - `manifest.json`;
 - a matching `wow64win.dll`;
-- the matching `ntdll.so` if the runtime requires it;
-- the probe executable and its provenance;
+- the probe executable and its source/patch evidence;
 - CrossOver public version and complete build;
-- SHA-256 values for all runtime anchors and supplied files;
-- source revision or a clear redistribution license.
+- SHA-256 values for all supplied files;
+- explicit provenance fields. Community prebuilt source revision, signature, and redistribution license remain `unconfirmed` until independently established.
 
 The probe must run before and after deployment. The portable acceptance rule is:
 
 ```text
-before: AFFECTED=yes and clobbered entries > 0
-after:  AFFECTED=no and clobbered entries = 0
+stock: AFFECTED=yes and clobbered entries > 0 before deployment
+after: AFFECTED=no and clobbered entries = 0 after deployment
 ```
 
-The exact pre-fix count is machine-dependent. `lsof` is not a sufficient proof for a mapped PE DLL; use probe output and `WINEDEBUG=+loaddll` records as well.
+The exact pre-fix count is machine-dependent; `238` is not a portable expectation. The overlay copies the current CrossOver `ntdll.so`, never an external one, and does not modify the CrossOver app. `lsof` is not a sufficient proof for a mapped PE DLL; use probe output, `WINEDEBUG=+loaddll`, the overlay runtime anchor, and the overlay manifest.
+
+The supplied OpenSetup patch is a separate file chain: it targets the installed game `setup.exe`, not `UaRO_Setup.exe`. The production profile is `gepard-crossover-26.3.0`; its full input and output hashes must match before any bytes are changed.

@@ -1,19 +1,30 @@
 {
+  "schema": 2,
+  "artifact_kind": "community_prebuilt",
+  "crossover_public_version": "26.3.0",
   "crossover_build": "26.3.0.39832",
-  "source_revision": "REPLACE_WITH_SOURCE_REVISION",
-  "license": "REPLACE_WITH_LICENSE_AND_REDISTRIBUTION_PERMISSION",
   "files": {
     "wow64win.dll": {
       "path": "wow64win.dll",
       "sha256": "REPLACE_WITH_SHA256"
     },
-    "ntdll.so": {
-      "path": "ntdll.so",
-      "sha256": "REPLACE_WITH_SHA256"
-    },
     "rawinput_overflow_probe.exe": {
       "path": "rawinput_overflow_probe.exe",
       "sha256": "REPLACE_WITH_SHA256"
+    },
+    "rawinput_patch": {
+      "path": "wow64win-rawinput-devicelist.patch",
+      "sha256": "REPLACE_WITH_SHA256"
+    },
+    "rawinput_probe_source": {
+      "path": "rawinput_overflow_probe.c",
+      "sha256": "REPLACE_WITH_SHA256"
     }
+  },
+  "provenance": {
+    "status": "community_prebuilt",
+    "source_revision": "unconfirmed",
+    "binary_signature": "unconfirmed",
+    "redistribution_license": "unconfirmed"
   }
 }

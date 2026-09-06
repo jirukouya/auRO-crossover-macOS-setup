@@ -1,3 +1,4 @@
 #!/bin/zsh
 set -euo pipefail
-exec python3 "${0:A:h}/patch-setup.py" "$@"
+SCRIPT_DIR="${0:A:h}"
+exec python3 "$SCRIPT_DIR/patch-setup.py" --state-file "$HOME/Library/Application Support/uaRO-CrossOver/state.json" "$@"

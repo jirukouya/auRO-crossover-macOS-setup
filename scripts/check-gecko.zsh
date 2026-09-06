@@ -5,13 +5,15 @@ SCRIPT_DIR="${0:A:h}"
 source "$SCRIPT_DIR/lib/crossover-common.zsh"
 
 BOTTLE_NAME="uaro-crossover"
+JSON=0
 uo_validate_bottle_name "$BOTTLE_NAME"
 
 while (( $# )); do
   case "$1" in
     --bottle) BOTTLE_NAME="$2"; shift 2 ;;
+    --json) JSON=1; shift ;;
     -h|--help)
-      print "Usage: check-gecko.zsh --bottle NAME"
+      print "Usage: check-gecko.zsh --bottle NAME [--json]"
       exit 0
       ;;
     *) print -u2 "unknown option: $1"; exit 2 ;;
@@ -26,6 +28,7 @@ uo_require_bottle
 
 GECKO_ROOT="$CX_ROOT/share/wine/gecko"
 [[ -d "$GECKO_ROOT" ]] || {
+  uo_state_merge_json '{"gecko":{"payload":"missing","bottle_marker":"unconfirmed"}}'
   uo_write_state gecko blocked
   uo_die "CrossOver Gecko payload directory is missing: $GECKO_ROOT"
 }
@@ -43,12 +46,15 @@ while IFS= read -r marker; do
   prefix_markers+=("$marker")
 done < <(find "$BOTTLE_DIR/drive_c/windows" -type f \( -iname 'mshtml.dll' -o -iname 'wine-gecko*' \) -print 2>/dev/null)
 
-uo_info "PASS: CrossOver Gecko payloads detected:"
-for payload in "${payloads[@]}"; do
-  uo_info "INFO: $payload"
-done
+if (( ! JSON )); then
+  uo_info "PASS: CrossOver Gecko payloads detected:"
+  for payload in "${payloads[@]}"; do
+    uo_info "INFO: $payload"
+  done
+fi
 
 if (( ${#prefix_markers[@]} == 0 )); then
+  uo_state_merge_json '{"gecko":{"payload":"pass","bottle_marker":"missing"}}'
   uo_write_state gecko blocked
   uo_die "CrossOver payload exists, but this bottle has no Gecko prefix marker yet; launch the Patcher once and install Gecko interactively, then rerun check-gecko"
 fi
@@ -56,9 +62,28 @@ fi
 uo_state_set gecko_status installed
 uo_state_set gecko_payloads "${(j:,:)payloads}"
 uo_state_set gecko_prefix_markers "${(j:,:)prefix_markers}"
+uo_state_merge_json "$(python3 - "${(j:,:)payloads}" "${(j:,:)prefix_markers}" <<'PY'
+import json
+import sys
+payloads, markers = sys.argv[1:]
+print(json.dumps({"gecko": {
+    "payload": "pass",
+    "bottle_marker": "pass",
+    "payloads": payloads.split(","),
+    "markers": markers.split(","),
+}}))
+PY
+)"
 uo_write_state gecko pass
-uo_info "PASS: bottle Gecko marker detected:"
-for marker in "${prefix_markers[@]}"; do
-  uo_info "INFO: $marker"
-done
-
+if (( JSON )); then
+  print -- "$(python3 - "${(j:,:)payloads}" "${(j:,:)prefix_markers}" <<'PY'
+import json, sys
+print(json.dumps({"payloads":sys.argv[1].split(","),"markers":sys.argv[2].split(","),"status":"pass"}))
+PY
+)"
+else
+  uo_info "PASS: bottle Gecko marker detected:"
+  for marker in "${prefix_markers[@]}"; do
+    uo_info "INFO: $marker"
+  done
+fi

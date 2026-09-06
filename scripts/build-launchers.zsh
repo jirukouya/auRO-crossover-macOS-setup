@@ -84,6 +84,7 @@ create_launcher() {
   fi
   mkdir -p "$macos_dir" "$resources_dir"
   cp "$SCRIPT_DIR/patch-setup.py" "$resources_dir/patch-setup.py"
+  cp "$SCRIPT_DIR/setup_profiles.py" "$resources_dir/setup_profiles.py"
   python3 - "$macos_dir/$executable_name" "$bundle/Contents/Info.plist" \
     "$display_name" "$bundle_id" "$executable_name" "$BOTTLE_NAME" "$GAME_DIR" \
     "$OVERLAY_DIR/bin/wine" "$app_win" "$SETUP_WIN" "$SETUP_PATH" <<'PY'
@@ -103,13 +104,50 @@ APP_WIN="__APP_WIN__"
 SETUP_WIN="__SETUP_WIN__"
 SETUP_PATH="__SETUP_PATH__"
 PATCH_SCRIPT="$APP_ROOT/Contents/Resources/patch-setup.py"
+STATE_FILE="$HOME/Library/Application Support/uaRO-CrossOver/state.json"
+LOG_DIR="$HOME/Library/Application Support/uaRO-CrossOver/logs"
+mkdir -p "$LOG_DIR"
+LAUNCH_LOG="$LOG_DIR/launcher-$(date +%Y%m%d-%H%M%S).log"
 
 [[ -d "$GAME_DIR" ]] || { print -u2 -- "uaRO game directory is missing: $GAME_DIR"; exit 1; }
 [[ -x "$WINE_CMD" ]] || { print -u2 -- "CrossOver overlay wine wrapper is missing: $WINE_CMD"; exit 1; }
 cd "$GAME_DIR"
-export WINE_CPU_TOPOLOGY="${WINE_CPU_TOPOLOGY:-4:0,1,2,3}"
-python3 "$PATCH_SCRIPT" --setup "$SETUP_PATH"
-exec "$WINE_CMD" --bottle "$BOTTLE_NAME" --workdir "$GAME_DIR" --cx-app "$APP_WIN"
+python3 "$PATCH_SCRIPT" --setup "$SETUP_PATH" --state-file "$STATE_FILE"
+print -- "launcher=$0 bottle=$BOTTLE_NAME game_dir=$GAME_DIR wine=$WINE_CMD" | tee "$LAUNCH_LOG"
+"$WINE_CMD" --bottle "$BOTTLE_NAME" --workdir "$GAME_DIR" --cx-app "$APP_WIN" >>"$LAUNCH_LOG" 2>&1 &
+CHILD_PID=$!
+python3 - "$STATE_FILE" "$0" "$CHILD_PID" "$LAUNCH_LOG" "$GAME_DIR" "$WINE_CMD" <<'STATEPY'
+import json, os, sys, tempfile
+from datetime import datetime, timezone
+from pathlib import Path
+path, launcher, pid, log, game_dir, wine = sys.argv[1:]
+try: state = json.loads(Path(path).read_text(encoding="utf-8"))
+except (FileNotFoundError, json.JSONDecodeError): state = {}
+state.setdefault("schema", 2)
+state["launch"] = {"launcher": launcher, "pid": int(pid), "launch_path": "patcher_launcher",
+    "runtime": "overlay", "runtime_anchor": "pending", "started_at": datetime.now(timezone.utc).isoformat(),
+    "log": log, "game_dir": game_dir, "wine": wine}
+Path(path).parent.mkdir(parents=True, exist_ok=True)
+fd, tmp = tempfile.mkstemp(prefix=".state.", suffix=".part", dir=Path(path).parent)
+with os.fdopen(fd, "w", encoding="utf-8") as handle:
+    json.dump(state, handle, indent=2, sort_keys=True); handle.write("\n"); handle.flush(); os.fsync(handle.fileno())
+os.replace(tmp, path)
+STATEPY
+print -- "PID=$CHILD_PID; verify with: uaro-crossover.zsh verify-live-runtime --bottle $BOTTLE_NAME --json"
+set +e
+wait "$CHILD_PID"
+RC=$?
+set -e
+python3 - "$STATE_FILE" "$RC" <<'EXITPY'
+import json, sys
+from pathlib import Path
+path, rc = sys.argv[1:]
+try: state = json.loads(Path(path).read_text(encoding="utf-8"))
+except (FileNotFoundError, json.JSONDecodeError): state = {}
+state.setdefault("launch", {})["last_exit_code"] = int(rc)
+Path(path).write_text(json.dumps(state, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+EXITPY
+exit "$RC"
 '''
 for token, value in {
     "__GAME_DIR__": game_dir,
@@ -129,8 +167,8 @@ plist = {
     "CFBundleInfoDictionaryVersion": "6.0",
     "CFBundleName": display,
     "CFBundlePackageType": "APPL",
-    "CFBundleShortVersionString": "0.1.0",
-    "CFBundleVersion": "0.1.0",
+    "CFBundleShortVersionString": "0.2.0",
+    "CFBundleVersion": "0.2.0",
     "LSMinimumSystemVersion": "13.0",
     "NSHighResolutionCapable": True,
 }
@@ -152,4 +190,4 @@ create_launcher "UaRO CrossOver Settings" "com.jirukouya.uaro.crossover.settings
 GAME_DIR="$GAME_DIR"
 uo_write_state launchers built
 uo_info "PASS: created the two supported launchers under $APPLICATIONS_DIR"
-uo_info "INFO: no patcher-bypass Game.app was created"
+uo_info "INFO: no direct game launcher was created"

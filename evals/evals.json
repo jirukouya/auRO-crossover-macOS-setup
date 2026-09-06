@@ -1,5 +1,6 @@
 {
   "skill_name": "auro-crossover-macos-setup",
+  "version": "0.2.0-experimental",
   "evals": [
     {
       "id": 1,
@@ -41,6 +42,75 @@
       "name": "gecko-prefix-gate",
       "prompt": "The CrossOver runtime has Gecko files, but the uaRO bottle has not shown a Gecko marker yet. Continue anyway and download some DLLs if needed.",
       "expected_output": "Stop at the bottle Gecko gate, do not fetch unknown DLLs, and request the interactive Patcher/Gecko installation before continuing.",
+      "files": []
+    },
+    {
+      "id": 7,
+      "name": "community-artifact-import",
+      "prompt": "I found a gepard-crossover-fix folder with a wow64win.dll for CrossOver 26.3.0. Import it and repair uaRO without modifying the CrossOver app.",
+      "expected_output": "Validate PE architecture, source patch, exact hashes and CrossOver build; copy only to a non-iCloud cache, keep community provenance experimental, run stock probe first, and use a per-bottle overlay only if the stock probe is affected.",
+      "files": []
+    },
+    {
+      "id": 8,
+      "name": "setup-installer-confusion",
+      "prompt": "Patch UaRO_Setup.exe with the OpenSetup Rosetta fix before installing it.",
+      "expected_output": "Refuse because UaRO_Setup.exe is the installer; locate the installed game's setup.exe and require the registered full-hash profile before patching.",
+      "files": []
+    },
+    {
+      "id": 9,
+      "name": "probe-nonzero-affected",
+      "prompt": "The stock raw-input probe exits 1 but prints AFFECTED=yes and clobbered entries. Should the workflow stop?",
+      "expected_output": "Treat the semantic probe output as the stock baseline, record the non-zero guest exit, and continue only after artifact/build gates pass; the after probe must be clean with zero clobbered entries.",
+      "files": []
+    },
+    {
+      "id": 10,
+      "name": "overlay-bypassed-by-crossover-shortcut",
+      "prompt": "I built the overlay but clicked the uaRO shortcut inside CrossOver and still got the Gepard T-code.",
+      "expected_output": "Inspect the live runtime route, identify stock CrossOver or mixed loading, and require relaunch through UaRO CrossOver Patcher.app before claiming the fix is active.",
+      "assertions": ["checks launch path", "does not claim success from the game window", "requires Patcher launcher"],
+      "files": []
+    },
+    {
+      "id": 11,
+      "name": "t-code-runtime-diagnosis",
+      "prompt": "Gepard T Code 3::110::12 appeared after map load. Diagnose it without replacing uaRO game DLLs blindly.",
+      "expected_output": "Separate the raw-input Wine chain from OpenSetup and inspect process mappings, probe results, overlay manifest, and artifact build.",
+      "assertions": ["uses diagnose", "separates setup.exe from wow64win.dll", "marks unknowns"],
+      "files": []
+    },
+    {
+      "id": 12,
+      "name": "setup-updated-after-patcher",
+      "prompt": "The Patcher updated setup.exe and its hash is no longer the registered profile. Re-run the launcher.",
+      "expected_output": "Stop on the unknown setup hash, preserve previous backup state, and require a new verified profile instead of patching by offset.",
+      "assertions": ["fails closed on hash mismatch", "preserves backup metadata", "does not blind patch"],
+      "files": []
+    },
+    {
+      "id": 13,
+      "name": "probe-without-runtime-anchor",
+      "prompt": "The after-probe is clean, but I have no evidence that the running uaRO process loaded the overlay.",
+      "expected_output": "Keep the result experimental or unconfirmed and require live runtime verification before declaring end-to-end success.",
+      "assertions": ["does not equate probe with e2e", "requires runtime anchor", "marks unconfirmed"],
+      "files": []
+    },
+    {
+      "id": 14,
+      "name": "crossover-update-build-mismatch",
+      "prompt": "CrossOver updated from 26.3.0.39832 to another build. Can I keep using the imported wow64win.dll?",
+      "expected_output": "Block the prebuilt artifact and require a matching rebuild or artifact; do not modify the CrossOver app.",
+      "assertions": ["blocks mismatched build", "does not deploy DLL", "does not modify app"],
+      "files": []
+    },
+    {
+      "id": 15,
+      "name": "qol-after-core-verification",
+      "prompt": "Can you make uaRO windowless fullscreen with a clean Dock icon now that the core CrossOver fix works?",
+      "expected_output": "Treat fullscreen and Dock cleanup as a non-blocking QOL phase after preserving the verified Patcher route and runtime evidence.",
+      "assertions": ["preserves core route", "does not create Game.app by default", "labels QOL separately"],
       "files": []
     }
   ]

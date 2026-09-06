@@ -1,0 +1,18 @@
+Fix wow64_NtUserGetRawInputDeviceList() copying uninitialised entries.
+
+NtUserGetRawInputDeviceList() returns the number of devices it stored in the
+caller's buffer, while *device_count remains the caller's capacity in this
+path. The wow64 thunk must convert only the returned entries.
+
+--- a/dlls/wow64win/user.c
++++ b/dlls/wow64win/user.c
+@@ -3041,7 +3041,13 @@ NTSTATUS WINAPI wow64_NtUserGetRawInputDeviceList( UINT *args )
+         ret = NtUserGetRawInputDeviceList( devices64, count, sizeof(RAWINPUTDEVICELIST) );
+         if (ret == ~0u) return ret;
+
+-        for (i = 0; i < *count; ++i)
++        /* Only ret entries of devices64 are initialised. */
++        for (i = 0; i < ret; ++i)
+         {
+             devices32[i].hDevice = (UINT_PTR)devices64[i].hDevice;
+             devices32[i].dwType  = devices64[i].dwType;

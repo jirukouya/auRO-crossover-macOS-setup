@@ -60,6 +60,25 @@ assert_probe_clean() {
   grep -Eiq 'entries[[:space:]]+clobbered.*(=|:)[[:space:]]*0|clobbered.*past.*(=|:)[[:space:]]*0' "$log" || \
     uo_die "raw-input probe did not report zero clobbered entries: $log"
 }
+
+record_probe_state() {
+  local scope="$1"
+  local probe_status="$2"
+  local patch_json
+  patch_json="$(python3 - "$ARTIFACT_DIR" "$scope" "$probe_status" "$PROBE_LOG" "$PROBE_AFFECTED" "$PROBE_CLOBBERED" <<'PY'
+import json
+import sys
+
+artifact_dir, scope, status, log, affected, clobbered = sys.argv[1:]
+print(json.dumps({"raw_input": {
+    "artifact_dir": artifact_dir,
+    scope: {"status": status, "log": log, "affected": affected, "clobbered": int(clobbered)},
+    "status": status,
+}}))
+PY
+  )"
+  uo_state_merge_json "$patch_json"
+}
 probe_summary() {
   python3 - "$1" <<'PY'
 import re
@@ -105,14 +124,18 @@ run_probe() {
     rc=$?
   fi
   print -- "$output" | tee "$log"
-  (( rc == 0 )) || uo_die "raw-input probe exited with status $rc"
   typeset -a summary=("${(@f)$(probe_summary "$log")}")
   PROBE_AFFECTED="${summary[1]}"
   PROBE_CLOBBERED="${summary[2]}"
   if (( require_clean )); then
     assert_probe_clean "$log"
+    (( rc == 0 )) || uo_warn "clean probe returned non-zero guest exit ($rc); semantic output passed"
     uo_info "PASS: raw-input probe is clean ($tag)"
+  elif [[ "$PROBE_AFFECTED" == "yes" ]]; then
+    (( rc == 0 )) && uo_warn "affected probe returned zero; using semantic output as the gate"
+    uo_info "PASS: raw-input probe recorded affected=$PROBE_AFFECTED clobbered=$PROBE_CLOBBERED ($tag; guest rc=$rc)"
   else
+    (( rc == 0 )) || uo_warn "stock probe returned non-zero but semantic output is clean"
     uo_info "PASS: raw-input probe recorded affected=$PROBE_AFFECTED clobbered=$PROBE_CLOBBERED ($tag)"
   fi
   PROBE_LOG="$log"
@@ -122,6 +145,7 @@ case "$ACTION" in
   probe)
     "${VERIFY_PROBE_ARTIFACT[@]}"
     run_probe "$CX_WINE" before 0
+    record_probe_state stock affected
     uo_state_set overlay_probe_before pass
     uo_state_set overlay_probe_before_log "$PROBE_LOG"
     uo_state_set overlay_probe_before_affected "$PROBE_AFFECTED"
@@ -135,33 +159,57 @@ case "$ACTION" in
     [[ "$(uo_state_get overlay_probe_before_affected 2>/dev/null || true)" == "yes" ]] || \
       uo_die "stock probe did not report AFFECTED=yes; refusing to deploy an overlay that is not needed"
     [[ ! -e "$OVERLAY_DIR" ]] || uo_die "overlay already exists; inspect it or remove it explicitly before rebuilding: $OVERLAY_DIR"
-    mkdir -p "$OVERLAY_DIR/bin" "$OVERLAY_DIR/lib/wine" "$OVERLAY_DIR/share"
-    cp -R "$CX_ROOT/bin/." "$OVERLAY_DIR/bin/"
-    cp -R "$CX_ROOT/lib/wine/." "$OVERLAY_DIR/lib/wine/"
-    cp -R "$CX_ROOT/share/." "$OVERLAY_DIR/share/"
+    mkdir -p "${OVERLAY_DIR:h}"
+    STAGING_DIR="$(mktemp -d "$OVERLAY_DIR.stage.XXXXXX")"
+    trap '[[ -n "${STAGING_DIR:-}" && -d "$STAGING_DIR" ]] && /bin/rm -rf -- "$STAGING_DIR"' EXIT INT TERM
+    for relative in bin lib/wine share; do
+      [[ -d "$CX_ROOT/$relative" ]] || uo_die "CrossOver runtime directory is missing: $CX_ROOT/$relative"
+      mkdir -p "$STAGING_DIR/$relative"
+      cp -R "$CX_ROOT/$relative/." "$STAGING_DIR/$relative/"
+    done
+    [[ -d "$CX_ROOT/lib/perl" ]] || uo_die "CrossOver runtime support is missing: $CX_ROOT/lib/perl"
+    mkdir -p "$STAGING_DIR/lib/perl"
+    cp -R "$CX_ROOT/lib/perl/." "$STAGING_DIR/lib/perl/"
+    if [[ -d "$CX_ROOT/lib64" ]]; then
+      mkdir -p "$STAGING_DIR/lib64"
+      cp -R "$CX_ROOT/lib64/." "$STAGING_DIR/lib64/"
+    fi
 
     wow64_source="$(artifact_path wow64win.dll)"
-    ntdll_source="$(artifact_path ntdll.so)"
-    mkdir -p "$OVERLAY_DIR/lib/wine/x86_64-windows" "$OVERLAY_DIR/lib/wine/x86_64-unix"
-    cp -p "$wow64_source" "$OVERLAY_DIR/lib/wine/x86_64-windows/wow64win.dll"
-    cp -p "$ntdll_source" "$OVERLAY_DIR/lib/wine/x86_64-unix/ntdll.so"
-    codesign --force --sign - "$OVERLAY_DIR/lib/wine/x86_64-unix/ntdll.so" >/dev/null
-    [[ -x "$OVERLAY_DIR/bin/wine" ]] || uo_die "overlay wine wrapper was not copied"
-    [[ -f "$OVERLAY_DIR/lib/wine/x86_64-windows/wow64win.dll" ]] || uo_die "overlay wow64win.dll is missing"
-    [[ -f "$OVERLAY_DIR/lib/wine/x86_64-unix/ntdll.so" ]] || uo_die "overlay ntdll.so is missing"
+    ntdll_source="$CX_ROOT/lib/wine/x86_64-unix/ntdll.so"
+    [[ -f "$ntdll_source" ]] || uo_die "CrossOver ntdll.so is missing: $ntdll_source"
+    mkdir -p "$STAGING_DIR/lib/wine/x86_64-windows" "$STAGING_DIR/lib/wine/x86_64-unix"
+    cp -p "$wow64_source" "$STAGING_DIR/lib/wine/x86_64-windows/wow64win.dll"
+    cp -p "$ntdll_source" "$STAGING_DIR/lib/wine/x86_64-unix/ntdll.so"
+    codesign --force --sign - "$STAGING_DIR/lib/wine/x86_64-unix/ntdll.so" >/dev/null
+    [[ -x "$STAGING_DIR/bin/wine" ]] || uo_die "overlay wine wrapper was not copied"
+    [[ -f "$STAGING_DIR/lib/perl/CXLog.pm" ]] || uo_die "overlay is incomplete: lib/perl/CXLog.pm is missing"
+    [[ -f "$STAGING_DIR/lib/wine/x86_64-windows/wow64win.dll" ]] || uo_die "overlay wow64win.dll is missing"
+    [[ -f "$STAGING_DIR/lib/wine/x86_64-unix/ntdll.so" ]] || uo_die "overlay ntdll.so is missing"
 
-    python3 - "$OVERLAY_DIR/overlay-manifest.json" "$CX_BUILD" "$OVERLAY_DIR" \
+    python3 - "$STAGING_DIR/overlay-manifest.json" "$CX_VERSION" "$CX_BUILD" "$OVERLAY_DIR" \
       "$wow64_source" "$ntdll_source" <<'PY'
 import hashlib
 import json
 import sys
 from pathlib import Path
 
-manifest_path, build, overlay, wow64_source, ntdll_source = sys.argv[1:]
+manifest_path, version, build, overlay, wow64_source, ntdll_source = sys.argv[1:]
 def digest(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+def tree_digest(path: Path) -> str:
+    value = hashlib.sha256()
+    for child in sorted(path.rglob("*")):
+        if child.is_file():
+            value.update(str(child.relative_to(path)).encode("utf-8"))
+            value.update(b"\0")
+            value.update(child.read_bytes())
+    return value.hexdigest()
 overlay_path = Path(overlay)
+support_paths = ["bin", "lib/wine", "lib/perl", "share"] + (["lib64"] if (overlay_path / "lib64").exists() else [])
 data = {
+    "schema": 2,
+    "crossover_public_version": version,
     "crossover_build": build,
     "overlay_dir": str(overlay_path),
     "artifact_files": {
@@ -169,13 +217,19 @@ data = {
         "ntdll.so": {"source": ntdll_source, "sha256": digest(Path(ntdll_source))},
     },
     "overlay_files": {
-        "wow64win.dll": digest(overlay_path / "lib/wine/x86_64-windows/wow64win.dll"),
-        "ntdll.so": digest(overlay_path / "lib/wine/x86_64-unix/ntdll.so"),
+        "lib/wine/x86_64-windows/wow64win.dll": digest(overlay_path / "lib/wine/x86_64-windows/wow64win.dll"),
+        "lib/wine/x86_64-unix/ntdll.so": digest(overlay_path / "lib/wine/x86_64-unix/ntdll.so"),
+        "lib/perl/CXLog.pm": digest(overlay_path / "lib/perl/CXLog.pm"),
+        "bin/wine": digest(overlay_path / "bin/wine"),
     },
+    "support_paths": support_paths,
+    "support_hashes": {relative: tree_digest(overlay_path / relative) for relative in support_paths},
     "probe_after": "pending",
 }
 Path(manifest_path).write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 PY
+    mv "$STAGING_DIR" "$OVERLAY_DIR"
+    STAGING_DIR=""
     uo_state_set overlay_dir "$OVERLAY_DIR"
     uo_state_set overlay_artifact_hash "$(uo_hash "$OVERLAY_DIR/lib/wine/x86_64-windows/wow64win.dll")"
     uo_write_state overlay built
@@ -188,7 +242,7 @@ PY
     [[ -f "$OVERLAY_DIR/lib/wine/x86_64-windows/wow64win.dll" ]] || uo_die "overlay wow64win.dll is missing"
     [[ -f "$OVERLAY_DIR/lib/wine/x86_64-unix/ntdll.so" ]] || uo_die "overlay ntdll.so is missing"
     codesign --verify --strict "$OVERLAY_DIR/lib/wine/x86_64-unix/ntdll.so" >/dev/null
-    python3 - "$OVERLAY_DIR/overlay-manifest.json" "$CX_BUILD" "$OVERLAY_DIR" <<'PY'
+    python3 - "$OVERLAY_DIR/overlay-manifest.json" "$CX_VERSION" "$CX_BUILD" "$OVERLAY_DIR" <<'PY'
 import hashlib
 import json
 import sys
@@ -196,20 +250,31 @@ from pathlib import Path
 
 path = Path(sys.argv[1])
 manifest = json.loads(path.read_text(encoding="utf-8"))
-overlay = Path(sys.argv[3]).resolve()
-if manifest.get("crossover_build") != sys.argv[2]:
-    raise SystemExit("ERROR: overlay CrossOver build does not match the current CrossOver build")
+overlay = Path(sys.argv[4]).resolve()
+if manifest.get("schema") != 2 or manifest.get("crossover_public_version") != sys.argv[2] or manifest.get("crossover_build") != sys.argv[3]:
+    raise SystemExit("ERROR: overlay CrossOver version/build does not match the current CrossOver")
 if Path(manifest.get("overlay_dir", "")).resolve() != overlay:
     raise SystemExit("ERROR: overlay manifest path does not match the requested overlay")
-for relative, expected in (
-    ("lib/wine/x86_64-windows/wow64win.dll", manifest.get("overlay_files", {}).get("wow64win.dll")),
-    ("lib/wine/x86_64-unix/ntdll.so", manifest.get("overlay_files", {}).get("ntdll.so")),
-):
+for relative, expected in manifest.get("overlay_files", {}).items():
     actual = hashlib.sha256((overlay / relative).read_bytes()).hexdigest()
     if actual != expected:
         raise SystemExit(f"ERROR: overlay SHA-256 mismatch for {relative}")
+def tree_digest(path):
+    import hashlib
+    value = hashlib.sha256()
+    for child in sorted(path.rglob("*")):
+        if child.is_file():
+            value.update(str(child.relative_to(path)).encode("utf-8"))
+            value.update(b"\0")
+            value.update(child.read_bytes())
+    return value.hexdigest()
+for relative, expected in manifest.get("support_hashes", {}).items():
+    path = overlay / relative
+    if not path.is_dir() or tree_digest(path) != expected:
+        raise SystemExit(f"ERROR: overlay support tree SHA-256 mismatch for {relative}")
 PY
     run_probe "$OVERLAY_DIR/bin/wine" after 1
+    record_probe_state after clean
     uo_state_set overlay_probe_after pass
     uo_state_set overlay_probe_after_log "$PROBE_LOG"
     uo_state_set overlay_probe_after_affected "$PROBE_AFFECTED"

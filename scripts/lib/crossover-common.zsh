@@ -137,9 +137,10 @@ path, phase, status, cx_app, cx_version, cx_build, bottle, game_dir = sys.argv[1
 try:
     with open(path, encoding="utf-8") as handle:
         state = json.load(handle)
-except (FileNotFoundError, json.JSONDecodeError):
+except (FileNotFoundError, json.JSONDecodeError, KeyError, TypeError):
     state = {}
 state.update({
+    "schema": 2,
     "updated_at": datetime.now(timezone.utc).isoformat(),
     "phase": phase,
     "status": status,
@@ -148,6 +149,8 @@ state.update({
     "crossover_build": cx_build,
     "bottle": bottle,
 })
+for section in ("installer", "setup", "gecko", "raw_input", "launchers"):
+    state.setdefault(section, {})
 if game_dir:
     state["game_dir"] = game_dir
 with open(path, "w", encoding="utf-8") as handle:
@@ -172,6 +175,7 @@ try:
 except (FileNotFoundError, json.JSONDecodeError):
     state = {}
 state[key] = value
+state.setdefault("schema", 2)
 with open(path, "w", encoding="utf-8") as handle:
     json.dump(state, handle, indent=2, sort_keys=True)
     handle.write("\n")
@@ -184,21 +188,46 @@ uo_state_merge_json() {
   mkdir -p "${file:h}"
   python3 - "$file" "$patch_json" <<'PY'
 import json
+import os
 import sys
+import tempfile
+from datetime import datetime, timezone
+from pathlib import Path
 
 path, patch_json = sys.argv[1:]
 try:
-    with open(path, encoding="utf-8") as handle:
-        state = json.load(handle)
+    state = json.loads(Path(path).read_text(encoding="utf-8"))
 except (FileNotFoundError, json.JSONDecodeError):
     state = {}
 patch = json.loads(patch_json)
 if not isinstance(patch, dict):
     raise SystemExit("state patch must be a JSON object")
-state.update(patch)
-with open(path, "w", encoding="utf-8") as handle:
-    json.dump(state, handle, indent=2, sort_keys=True)
-    handle.write("\n")
+
+def merge(left, right):
+    for key, value in right.items():
+        if isinstance(value, dict) and isinstance(left.get(key), dict):
+            merge(left[key], value)
+        else:
+            left[key] = value
+
+merge(state, patch)
+state.setdefault("schema", 2)
+state["updated_at"] = datetime.now(timezone.utc).isoformat()
+target = Path(path)
+fd, temporary = tempfile.mkstemp(prefix=f".{target.name}.", suffix=".part", dir=target.parent)
+try:
+    with os.fdopen(fd, "w", encoding="utf-8") as handle:
+        json.dump(state, handle, indent=2, sort_keys=True)
+        handle.write("\n")
+        handle.flush()
+        os.fsync(handle.fileno())
+    os.replace(temporary, target)
+except Exception:
+    try:
+        os.unlink(temporary)
+    except FileNotFoundError:
+        pass
+    raise
 PY
 }
 
@@ -212,7 +241,9 @@ import sys
 
 try:
     with open(sys.argv[1], encoding="utf-8") as handle:
-        value = json.load(handle).get(sys.argv[2])
+        value = json.load(handle)
+    for part in sys.argv[2].split("."):
+        value = value[part]
 except (FileNotFoundError, json.JSONDecodeError):
     raise SystemExit(1)
 if value is None:

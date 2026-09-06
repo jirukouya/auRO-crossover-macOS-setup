@@ -34,14 +34,21 @@ for display_name in "UaRO CrossOver Patcher" "UaRO CrossOver Settings"; do
   executable="$bundle/Contents/MacOS/$display_name"
   plist="$bundle/Contents/Info.plist"
   helper="$bundle/Contents/Resources/patch-setup.py"
+  profiles="$bundle/Contents/Resources/setup_profiles.py"
   if [[ ! -d "$bundle" || ! -f "$executable" || ! -f "$plist" || ! -f "$helper" ]]; then
     uo_warn "launcher is incomplete: $bundle"
+    failures=$(( failures + 1 ))
+    continue
+  fi
+  if [[ ! -f "$profiles" && ! $FIX ]]; then
+    uo_warn "launcher is missing the hash-profile helper: $bundle"
     failures=$(( failures + 1 ))
     continue
   fi
   if (( FIX )); then
     chmod +x "$executable"
     cp "$SCRIPT_DIR/patch-setup.py" "$helper"
+    cp "$SCRIPT_DIR/setup_profiles.py" "$profiles"
     codesign --force --deep --sign - "$bundle" >/dev/null
   fi
   if ! zsh -n "$executable"; then
