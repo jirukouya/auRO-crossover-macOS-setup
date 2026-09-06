@@ -1,0 +1,8 @@
+#!/bin/zsh
+set -euo pipefail
+ROOT="${0:A:h}"
+
+python3 "$ROOT/test_patch_setup.py"
+python3 "$ROOT/test_configure_game.py"
+python3 "$ROOT/test_artifact.py"
+"$ROOT/test_shell_static.zsh"

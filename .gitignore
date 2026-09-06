@@ -1,0 +1,10 @@
+.DS_Store
+*.log
+*.orig-backup
+*.bak
+*.zip
+*.bin
+__pycache__/
+*.py[cod]
+private-artifacts/
+test-work/

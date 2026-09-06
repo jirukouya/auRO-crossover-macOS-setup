@@ -1,0 +1,21 @@
+name: lint-and-fixtures
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  static:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run shell and fixture checks
+        run: ./tests/run-tests.zsh
+      - name: Compile Python files
+        run: python3 -m py_compile scripts/*.py tests/*.py
+      - name: Validate JSON documents
+        run: |
+          python3 -m json.tool evals/evals.json >/dev/null
+          python3 -m json.tool references/raw-input-manifest.example.json >/dev/null
+      - name: Check whitespace
+        run: git diff --check

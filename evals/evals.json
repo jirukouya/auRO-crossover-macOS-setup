@@ -1,0 +1,33 @@
+{
+  "skill_name": "auro-crossover-macos-setup",
+  "evals": [
+    {
+      "id": 1,
+      "name": "fresh-crossover-install",
+      "prompt": "Install uaRO on this Apple Silicon Mac using CrossOver and its bundled CLI. Stop if the installer or required artifact is missing, and keep the existing Whisky install untouched.",
+      "expected_output": "Run CrossOver preflight first, use cxbottle and CrossOver bin/wine, preserve human login steps, and do not claim completion without end-to-end verification.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "name": "raw-input-build-mismatch",
+      "prompt": "My CrossOver is a different build from the one used to make this wow64win.dll. Can you repair Gepard T Code 3::110::12?",
+      "expected_output": "Stop before deploying the prebuilt DLL and require a matching artifact or rebuild with provenance.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "name": "whisky-near-miss",
+      "prompt": "Set up uaRO with Whisky and the archived WhiskyWine runtime.",
+      "expected_output": "Do not trigger the CrossOver Skill; route to the Whisky workflow instead.",
+      "files": []
+    },
+    {
+      "id": 4,
+      "name": "safe-uninstall",
+      "prompt": "Remove my uaRO CrossOver install but keep CrossOver and any other bottles. Back up savedata first.",
+      "expected_output": "Ask for or require an explicit scoped uninstall level, back up savedata, and avoid broad deletion.",
+      "files": []
+    }
+  ]
+}
