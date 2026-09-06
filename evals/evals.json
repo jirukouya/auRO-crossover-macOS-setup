@@ -28,6 +28,20 @@
       "prompt": "Remove my uaRO CrossOver install but keep CrossOver and any other bottles. Back up savedata first.",
       "expected_output": "Ask for or require an explicit scoped uninstall level, back up savedata, and avoid broad deletion.",
       "files": []
+    },
+    {
+      "id": 5,
+      "name": "zip-installer-input",
+      "prompt": "I have a 4GB UaRO_Setup.zip containing the split installer files. Install it through CrossOver without extracting it into Documents or using ditto.",
+      "expected_output": "Validate the ZIP's exact three members and compressed data, preserve the original, cache it under ~/Games, stream members into the bottle, and retain the interactive installer gate.",
+      "files": []
+    },
+    {
+      "id": 6,
+      "name": "gecko-prefix-gate",
+      "prompt": "The CrossOver runtime has Gecko files, but the uaRO bottle has not shown a Gecko marker yet. Continue anyway and download some DLLs if needed.",
+      "expected_output": "Stop at the bottle Gecko gate, do not fetch unknown DLLs, and request the interactive Patcher/Gecko installation before continuing.",
+      "files": []
     }
   ]
 }

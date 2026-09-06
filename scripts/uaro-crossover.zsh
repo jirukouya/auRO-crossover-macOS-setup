@@ -4,7 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="${0:A:h}"
 
 usage() {
-  print "Usage: uaro-crossover.zsh <preflight|bottle|install|patch-setup|configure|overlay|build-launchers|repair|uninstall> [options]"
+  print "Usage: uaro-crossover.zsh <preflight|bottle|install|patch-setup|check-gecko|configure|overlay|build-launchers|repair|uninstall> [options]"
   print ""
   print "CrossOver is the only supported runtime. Use --help on each command for details."
 }
@@ -26,6 +26,9 @@ case "$command" in
     ;;
   patch-setup)
     exec python3 "$SCRIPT_DIR/patch-setup.py" "$@"
+    ;;
+  check-gecko)
+    exec "$SCRIPT_DIR/check-gecko.zsh" "$@"
     ;;
   configure)
     exec python3 "$SCRIPT_DIR/configure-game.py" "$@"

@@ -13,6 +13,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--artifact-dir", required=True, type=Path)
     parser.add_argument("--crossover-build", required=True)
+    parser.add_argument("--mode", choices=("probe", "overlay"), default="overlay")
     args = parser.parse_args()
 
     root = args.artifact_dir.expanduser().resolve()
@@ -34,7 +35,9 @@ def main() -> int:
     files = manifest.get("files")
     if not isinstance(files, dict):
         raise SystemExit("ERROR: manifest.files must be an object")
-    required = ("wow64win.dll", "ntdll.so", "rawinput_overflow_probe.exe")
+    required = ("rawinput_overflow_probe.exe",)
+    if args.mode == "overlay":
+        required = ("wow64win.dll", "ntdll.so", "rawinput_overflow_probe.exe")
     for name in required:
         entry = files.get(name)
         if not isinstance(entry, dict) or not entry.get("path") or not entry.get("sha256"):

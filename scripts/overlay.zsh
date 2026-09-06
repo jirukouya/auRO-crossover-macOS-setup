@@ -38,7 +38,8 @@ uo_require_bottle
 
 OVERLAY_DIR="${OVERLAY_DIR:-$BOTTLE_DIR/uaRO-CrossOver-overlay}"
 OVERLAY_DIR="${OVERLAY_DIR:A}"
-VERIFY_ARTIFACT=(python3 "$SCRIPT_DIR/verify-artifact.py" --artifact-dir "$ARTIFACT_DIR" --crossover-build "$CX_BUILD")
+VERIFY_PROBE_ARTIFACT=(python3 "$SCRIPT_DIR/verify-artifact.py" --artifact-dir "$ARTIFACT_DIR" --crossover-build "$CX_BUILD" --mode probe)
+VERIFY_OVERLAY_ARTIFACT=(python3 "$SCRIPT_DIR/verify-artifact.py" --artifact-dir "$ARTIFACT_DIR" --crossover-build "$CX_BUILD" --mode overlay)
 
 artifact_path() {
   python3 - "$ARTIFACT_DIR" "$1" <<'PY'
@@ -59,7 +60,7 @@ assert_probe_clean() {
   grep -Eiq 'entries[[:space:]]+clobbered.*(=|:)[[:space:]]*0|clobbered.*past.*(=|:)[[:space:]]*0' "$log" || \
     uo_die "raw-input probe did not report zero clobbered entries: $log"
 }
-+probe_summary() {
+probe_summary() {
   python3 - "$1" <<'PY'
 import re
 import sys
@@ -119,7 +120,7 @@ run_probe() {
 
 case "$ACTION" in
   probe)
-    "${VERIFY_ARTIFACT[@]}"
+    "${VERIFY_PROBE_ARTIFACT[@]}"
     run_probe "$CX_WINE" before 0
     uo_state_set overlay_probe_before pass
     uo_state_set overlay_probe_before_log "$PROBE_LOG"
@@ -128,7 +129,7 @@ case "$ACTION" in
     uo_write_state overlay probe-before-pass
     ;;
   build)
-    "${VERIFY_ARTIFACT[@]}"
+    "${VERIFY_OVERLAY_ARTIFACT[@]}"
     [[ "$(uo_state_get overlay_probe_before 2>/dev/null || true)" == "pass" ]] || \
       uo_die "run overlay probe first; refusing to build an overlay without a clean stock baseline"
     [[ "$(uo_state_get overlay_probe_before_affected 2>/dev/null || true)" == "yes" ]] || \
@@ -181,7 +182,7 @@ PY
     uo_info "PASS: built per-bottle overlay: $OVERLAY_DIR"
     ;;
   verify)
-    "${VERIFY_ARTIFACT[@]}"
+    "${VERIFY_OVERLAY_ARTIFACT[@]}"
     [[ -f "$OVERLAY_DIR/overlay-manifest.json" ]] || uo_die "overlay manifest missing: $OVERLAY_DIR/overlay-manifest.json"
     [[ -x "$OVERLAY_DIR/bin/wine" ]] || uo_die "overlay wine wrapper is missing: $OVERLAY_DIR/bin/wine"
     [[ -f "$OVERLAY_DIR/lib/wine/x86_64-windows/wow64win.dll" ]] || uo_die "overlay wow64win.dll is missing"

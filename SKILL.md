@@ -26,10 +26,12 @@ Human-controlled: uaRO account authentication and download, installer GUI choice
 
 ## Phase A — Preflight
 
-Run:
+Run one of these, with exactly one installer input:
 
 ```zsh
-scripts/uaro-crossover.zsh preflight --bottle uaro-crossover --installer-dir "$HOME/Games/UaRO-Installer"
+scripts/uaro-crossover.zsh preflight --bottle uaro-crossover \
+  --installer-zip "/path/to/UaRO_Setup.zip"
+# or: --installer-dir "$HOME/Games/UaRO-Installer"
 ```
 
 Require:
@@ -39,7 +41,7 @@ Require:
 - supported public version and exact build (`26.3.0.39832` for this draft);
 - the CrossOver `bin/wine` wrapper and `cxbottle` CLI;
 - enough free space;
-- three installer siblings with stable sizes and recorded SHA-256 values;
+- the exact three installer siblings; for a ZIP, validate its member list and compressed data before use;
 - a bottle name and game directory that do not overlap another installation.
 
 If two CrossOver app bundles exist with different builds, stop and ask the user to choose. If the build is unsupported, do not use a prebuilt DLL.
@@ -53,11 +55,13 @@ scripts/uaro-crossover.zsh bottle create --bottle uaro-crossover
 scripts/uaro-crossover.zsh bottle status --bottle uaro-crossover
 ```
 
-Stage and launch the installer through CrossOver's `wine --bottle ... --cx-app` wrapper. The installer is a split Inno Setup bundle and must contain, with exact names, `UaRO_Setup.exe`, `UaRO_Setup-1.bin`, and `UaRO_Setup-2.bin`. Confirm the resulting `uaRO.exe`, `UaRo Patcher.exe`, and `setup.exe` paths inside the selected bottle before continuing.
+Stage and launch the installer through CrossOver's `wine --bottle ... --cx-app` wrapper. The installer is a split Inno Setup bundle and must contain, with exact names, `UaRO_Setup.exe`, `UaRO_Setup-1.bin`, and `UaRO_Setup-2.bin`. ZIP input is copied, never moved, to `~/Games/UaRO-Installer/` and streamed into the bottle with temporary `.part` files; do not use `ditto` for this multi-gigabyte archive. Confirm the resulting `uaRO.exe`, `UaRo Patcher.exe`, and `setup.exe` paths inside the selected bottle before continuing.
 
 ## Phase C — Game patch and configuration
 
 Use `scripts/patch-setup.py` for the three known OpenSetup sites. It backs up first, checks original or already-patched bytes, changes only the expected bytes, and verifies a byte-for-byte diff. Site C is the string patch at `0x43C08`, `mss32.dll` to `mss32.off`; if its original bytes are not present, stop.
+
+Run `scripts/uaro-crossover.zsh check-gecko --bottle uaro-crossover` after installation. It checks the CrossOver-bundled Gecko payload and the selected bottle's actual prefix marker. If the payload exists but the bottle marker is absent, stop and launch the Patcher once for the user's interactive Gecko install; do not download an unknown runtime.
 
 Use `scripts/configure-game.py` for `dinput.ini` and `savedata/OptionInfo.lua`. It preserves backups, writes explicit windowed settings, and verifies the raw device-name bytes. Resolution remains provisional until the CrossOver settings path and a real on-screen result are confirmed.
 

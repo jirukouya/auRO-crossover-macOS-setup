@@ -33,12 +33,12 @@ The workflow automates local preparation, bottle setup, staging, patch validatio
 ```zsh
 scripts/uaro-crossover.zsh preflight \
   --bottle uaro-crossover \
-  --installer-dir "$HOME/Games/UaRO-Installer"
+  --installer-zip "/path/to/UaRO_Setup.zip"
 
 scripts/uaro-crossover.zsh bottle create --bottle uaro-crossover
 scripts/uaro-crossover.zsh install \
   --bottle uaro-crossover \
-  --installer-dir "$HOME/Games/UaRO-Installer"
+  --installer-zip "/path/to/UaRO_Setup.zip"
 ```
 
 Every state-changing command is explicit. Do not run `install`, `patch-setup`, `build-overlay`, or `build-launchers` until `preflight` passes and the required local artifacts have been supplied. `build-overlay` and `verify-overlay` are wrappers for the three-stage raw-input flow.

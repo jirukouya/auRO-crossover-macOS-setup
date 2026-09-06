@@ -22,7 +22,7 @@ uo_hash() {
 uo_realpath() {
   local path="$1"
   [[ -e "$path" ]] || return 1
-  (cd "$path" 2>/dev/null && pwd -P)
+  /bin/realpath "$path"
 }
 
 uo_validate_bottle_name() {
@@ -147,8 +147,9 @@ state.update({
     "crossover_version": cx_version,
     "crossover_build": cx_build,
     "bottle": bottle,
-    "game_dir": game_dir,
 })
+if game_dir:
+    state["game_dir"] = game_dir
 with open(path, "w", encoding="utf-8") as handle:
     json.dump(state, handle, indent=2, sort_keys=True)
     handle.write("\n")
@@ -171,6 +172,30 @@ try:
 except (FileNotFoundError, json.JSONDecodeError):
     state = {}
 state[key] = value
+with open(path, "w", encoding="utf-8") as handle:
+    json.dump(state, handle, indent=2, sort_keys=True)
+    handle.write("\n")
+PY
+}
+
+uo_state_merge_json() {
+  local patch_json="$1"
+  local file="$(uo_state_file)"
+  mkdir -p "${file:h}"
+  python3 - "$file" "$patch_json" <<'PY'
+import json
+import sys
+
+path, patch_json = sys.argv[1:]
+try:
+    with open(path, encoding="utf-8") as handle:
+        state = json.load(handle)
+except (FileNotFoundError, json.JSONDecodeError):
+    state = {}
+patch = json.loads(patch_json)
+if not isinstance(patch, dict):
+    raise SystemExit("state patch must be a JSON object")
+state.update(patch)
 with open(path, "w", encoding="utf-8") as handle:
     json.dump(state, handle, indent=2, sort_keys=True)
     handle.write("\n")

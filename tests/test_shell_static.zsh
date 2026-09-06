@@ -5,7 +5,8 @@ ROOT="${0:A:h:h}"
 for script in "$ROOT"/scripts/*.zsh "$ROOT"/scripts/lib/*.zsh \
   "$ROOT"/scripts/preflight "$ROOT"/scripts/install "$ROOT"/scripts/patch-setup \
   "$ROOT"/scripts/configure-game "$ROOT"/scripts/build-overlay "$ROOT"/scripts/verify-overlay \
-  "$ROOT"/scripts/build-launchers "$ROOT"/scripts/repair "$ROOT"/scripts/uninstall; do
+  "$ROOT"/scripts/build-launchers "$ROOT"/scripts/repair "$ROOT"/scripts/uninstall \
+  "$ROOT"/scripts/check-gecko "$ROOT"/scripts/verify-installer; do
   zsh -n "$script"
 done
 

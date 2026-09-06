@@ -4,6 +4,7 @@
 
 - Initial CrossOver-first repository and Skill skeleton.
 - Added CrossOver path/build discovery, bottle operations, installer staging, fail-closed OpenSetup patching, game configuration, overlay contracts, launcher validation, repair, rollback, and fixture tests.
+- Added exact three-member ZIP validation, non-iCloud installer caching, streaming staging, installer hash/member state, and a CrossOver Gecko check gate.
 - Deliberately excluded uaRO installers, credentials, savedata, and unverified Wine binaries.
 
 ## [0.1.0-draft] - 2026-09-06
