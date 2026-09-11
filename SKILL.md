@@ -36,9 +36,10 @@ For a JSON pre-flight result, use these exact keys to populate the ledger:
 | CROSSOVER_APP | `crossover_app` | PASS only when the path exists and belongs to the resolved build |
 | CX_VERSION | `crossover_version` | PASS when read from the current app |
 | CX_BUILD | `crossover_build` | PASS only when it matches the supported build or a matching artifact is verified |
-| BOTTLE_NAME | `bottle` | PASS after user choice or an unambiguous existing-state match |
+| BOTTLE_NAME | `bottle` | PASS after user choice or an unambiguous existing-state match; for fresh install, confirm the proposed `uaro-crossover` name before using it |
 | BOTTLE_PATH | `bottle_dir` | PASS when the returned path exists; absent is expected before a fresh bottle is created |
 | INSTALLER_SOURCE | `installer_source` | PASS only when installer status is complete |
+| INSTALLER_TYPE | `installer_type` | `zip` maps to `INSTALLER_ZIP`; `directory` maps to `INSTALLER_DIR`; never set both |
 | RAWINPUT_SOURCE_DIR | `rawinput_source_dir` | PASS only when the source report is candidate/valid |
 
 The state file is `STATE_FILE=$HOME/Library/Application Support/uaRO-CrossOver/state.json`. Read it before resuming an existing installation, but never treat a previous state entry as proof that the current bottle or files still exist.
@@ -87,7 +88,7 @@ Route-specific first action:
 
 | Route | First action | Next decision |
 |---|---|---|
-| Fresh install | Run Pre-flight with the installer input and raw-input source when available. | If the intended bottle does not exist, create it in Step 3; do not treat a missing status result as an installation failure. |
+| Fresh install | Confirm `BOTTLE_NAME`, record the installer/artifact inputs and `ARTIFACT_DIR`, then run Pre-flight with the installer input and raw-input source when available. | If the intended bottle does not exist, create it in Step 3; do not treat a missing status result as an installation failure. |
 | Existing/partial | Read state, run Pre-flight with `--allow-missing-installer` only when appropriate, then run bottle status. | Resume only after matching the state path to the current bottle and game files. |
 | Verify-only | Run `verify-live-runtime`; add `diagnose --error` when the user supplied an exact symptom. | Report `PASS`, `UNCONFIRMED`, or `BLOCKED`; do not mutate state except the normal verification record. |
 | Repair | Run diagnostic `repair` without `--fix`. | Use `--fix` only after confirming that the requested repair is limited to generated launchers. |
@@ -147,7 +148,7 @@ Use these variables only after resolving them from the current machine:
 | SETUP_PATH | Game directory | Usually GAME_DIR/setup.exe; verify before patching |
 | INSTALLER_ZIP or INSTALLER_DIR | User-supplied input | Never download or invent an installer source |
 | RAWINPUT_SOURCE_DIR | User-supplied raw-input candidate package | Source directory imported into the private cache |
-| ARTIFACT_DIR | Imported raw-input artifact cache | Required by the current stock probe contract |
+| ARTIFACT_DIR | User-selected non-iCloud cache path, or `raw_input.artifact_dir` after a prior import | Required by the current stock probe contract; default proposal is `$HOME/Games/UaRO-CrossOver-artifacts` and must be checked before use |
 | WIDTH, HEIGHT | User choice or current configuration | Explicitly confirm before writing game settings |
 | OVERLAY_DIR | Build output and state | Required only when the baseline is affected |
 | ERROR_TEXT | Exact user-reported symptom | Required when calling diagnose |
@@ -158,11 +159,11 @@ When a command prints a path, copy that exact path into the next command. Do not
 
 ## 5. Pre-flight and existing-state detection
 
-Run from the repository root. The command blocks below are templates: do not run a command until every variable on that line has a ledger value. If the installer or artifact source is not known yet, begin with host-only discovery:
+Run from the repository root. The command blocks below are templates: do not run a command until every variable on that line has a ledger value. Before the first command, confirm the proposed `BOTTLE_NAME` and choose `ARTIFACT_DIR`; for a fresh install, `uaro-crossover` and `$HOME/Games/UaRO-CrossOver-artifacts` are proposals only, not automatic selections. If the installer or artifact source is not known yet, begin with host-only discovery:
 
 ~~~zsh
 PREFLIGHT_JSON="/tmp/uaro-crossover-preflight.json"
-scripts/uaro-crossover.zsh preflight --bottle uaro-crossover --allow-missing-installer --json | tee "$PREFLIGHT_JSON"
+scripts/uaro-crossover.zsh preflight --bottle "$BOTTLE_NAME" --allow-missing-installer --json | tee "$PREFLIGHT_JSON"
 ~~~
 
 For a fresh installation with a known installer and raw-input source, prefer a single JSON pre-flight so the AI can build its ledger from one result:
@@ -172,7 +173,7 @@ PREFLIGHT_JSON="/tmp/uaro-crossover-preflight.json"
 scripts/uaro-crossover.zsh preflight --bottle "$BOTTLE_NAME" --installer-zip "$INSTALLER_ZIP" --rawinput-source-dir "$RAWINPUT_SOURCE_DIR" --json | tee "$PREFLIGHT_JSON"
 ~~~
 
-If only one installer input is known, use the matching form:
+If only one installer input is known, use the matching form. Set it from the pre-flight `installer_type` and `installer_source` values: `zip` means `INSTALLER_ZIP="$INSTALLER_SOURCE"`; `directory` means `INSTALLER_DIR="$INSTALLER_SOURCE"`. Keep the other variable unset:
 
 ~~~zsh
 scripts/uaro-crossover.zsh preflight --installer-zip "$INSTALLER_ZIP" --json
@@ -189,6 +190,8 @@ Use --allow-missing-installer only for host-only diagnosis or when the user has 
 
 Read the JSON result and populate the ledger from the exact keys in Section 0. In particular, set `CX_VERSION` from `crossover_version`, `CX_BUILD` from `crossover_build`, `BOTTLE_PATH` from `bottle_dir`, and keep `INSTALLER_SOURCE`/`RAWINPUT_SOURCE_DIR` tied to the paths that actually passed. If you did not save JSON, use the human-readable output and do not pretend that shell variables were automatically assigned.
 
+After `artifact import`, set `ARTIFACT_DIR` to the exact cache path printed by the command and confirmed by `raw_input.artifact_dir` in `STATE_FILE`. When resuming, prefer that state path only if it still exists and its manifest verifies against the current `CX_BUILD`. A path used only as a proposed default is not evidence that an artifact was imported.
+
 When JSON was saved, print the ledger candidates without evaluating them as shell code:
 
 ~~~zsh
@@ -204,6 +207,7 @@ for ledger, key in {
     "BOTTLE_NAME": "bottle",
     "BOTTLE_PATH": "bottle_dir",
     "INSTALLER_SOURCE": "installer_source",
+    "INSTALLER_TYPE": "installer_type",
     "RAWINPUT_SOURCE_DIR": "rawinput_source_dir",
 }.items():
     value = data.get(key)

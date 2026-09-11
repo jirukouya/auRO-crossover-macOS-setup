@@ -67,6 +67,8 @@ The default draft generates `UaRO CrossOver Patcher.app` and `UaRO CrossOver Set
 
 From the repository root, start with preflight and provide exactly one installer input:
 
+Confirm the bottle name before running it; `uaro-crossover` is only the default proposal. If you use JSON preflight, keep `installer_source` paired with `installer_type`: a `zip` source becomes `INSTALLER_ZIP`, while a `directory` source becomes `INSTALLER_DIR`. The raw-input cache path is also an explicit choice; the documented `$HOME/Games/UaRO-CrossOver-artifacts` path is only a proposal and must be verified after import.
+
 ```zsh
 scripts/uaro-crossover.zsh preflight \
   --bottle uaro-crossover \
