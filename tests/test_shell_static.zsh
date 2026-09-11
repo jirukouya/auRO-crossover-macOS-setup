@@ -43,6 +43,18 @@ if ! has_text '--json|launch_path|vmmap|runtime_anchor' \
   exit 1
 fi
 
+for marker in RUNTIME_MODE STOCK_BASELINE_CLEAN overlay_probe_before_clobbered; do
+  if ! has_text "$marker" "$ROOT/scripts/verify-live-runtime.zsh" "$ROOT/scripts/build-launchers.zsh"; then
+    print -u2 -- "ERROR: clean-stock runtime branch safeguard is missing: $marker"
+    exit 1
+  fi
+done
+
+if ! has_text 'runtime_mode' "$ROOT/scripts/build-launchers.zsh"; then
+  print -u2 -- "ERROR: launcher runtime state propagation is missing"
+  exit 1
+fi
+
 if has_text 'Game\.app' "$ROOT/scripts/build-launchers.zsh"; then
   print -u2 -- "ERROR: the first launcher release must not generate Game.app"
   exit 1

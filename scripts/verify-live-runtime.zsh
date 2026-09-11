@@ -33,8 +33,15 @@ uo_require_arm64_rosetta
 uo_require_bottle
 GAME_DIR="${GAME_DIR:-$(uo_state_get game_dir 2>/dev/null || true)}"
 OVERLAY_DIR="${OVERLAY_DIR:-$(uo_state_get overlay_dir 2>/dev/null || true)}"
-[[ -n "$OVERLAY_DIR" ]] || uo_die "overlay directory is required"
-OVERLAY_DIR="${OVERLAY_DIR:A}"
+if [[ -n "$OVERLAY_DIR" ]]; then
+  OVERLAY_DIR="${OVERLAY_DIR:A}"
+fi
+STOCK_BASELINE_CLEAN=0
+if [[ "$(uo_state_get overlay_probe_before 2>/dev/null || true)" == "pass" \
+    && "$(uo_state_get overlay_probe_before_affected 2>/dev/null || true)" == "no" \
+    && "$(uo_state_get overlay_probe_before_clobbered 2>/dev/null || true)" == "0" ]]; then
+  STOCK_BASELINE_CLEAN=1
+fi
 
 if [[ -z "$PID" ]]; then
   while IFS=$' \t' read -r candidate command; do
@@ -84,8 +91,8 @@ if (( ${#mapped[@]} > 0 )); then
   has_overlay=0
   has_stock=0
   for line in "${mapped[@]}"; do
-    [[ "$line" == *"$OVERLAY_DIR"* ]] && has_overlay=1
-    [[ "$line" == *"/Applications/CrossOver.app/"* || "$line" == *"/Applications/CrossOver.app"* ]] && has_stock=1
+    [[ -n "$OVERLAY_DIR" && "$line" == *"$OVERLAY_DIR"* ]] && has_overlay=1
+    [[ "$line" == *"$CX_APP/"* || "$line" == *"$CX_ROOT/"* ]] && has_stock=1
   done
   if (( has_overlay && !has_stock )); then
     launch_path="patcher_launcher"
@@ -106,7 +113,7 @@ ntdll_hash=""
 [[ -f "$wow64_path" ]] && wow64_hash="$(uo_hash "$wow64_path")"
 [[ -f "$ntdll_path" ]] && ntdll_hash="$(uo_hash "$ntdll_path")"
 expected_hash=""
-[[ -f "$OVERLAY_DIR/overlay-manifest.json" ]] && expected_hash="$(python3 - "$OVERLAY_DIR/overlay-manifest.json" <<'PY'
+[[ -n "$OVERLAY_DIR" && -f "$OVERLAY_DIR/overlay-manifest.json" ]] && expected_hash="$(python3 - "$OVERLAY_DIR/overlay-manifest.json" <<'PY'
 import json, sys
 try:
     print(json.load(open(sys.argv[1], encoding="utf-8"))["overlay_files"]["lib/wine/x86_64-windows/wow64win.dll"])
@@ -117,6 +124,8 @@ PY
 
 status="unconfirmed"
 if [[ "$runtime" == "overlay" && -n "$wow64_hash" && "$wow64_hash" == "$expected_hash" && -n "$ntdll_path" ]]; then
+  status="pass"
+elif [[ "$runtime" == "stock" && "$STOCK_BASELINE_CLEAN" == "1" && -n "$wow64_path" && -n "$ntdll_path" ]]; then
   status="pass"
 elif [[ "$runtime" == "stock" || "$runtime" == "mixed" ]]; then
   status="blocked"
@@ -158,7 +167,11 @@ PY
 if (( JSON )); then
   print -- "$RESULT_JSON"
 elif [[ "$status" == "pass" ]]; then
-  uo_info "PASS: PID $PID is using the per-bottle overlay runtime"
+  if [[ "$runtime" == "overlay" ]]; then
+    uo_info "PASS: PID $PID is using the per-bottle overlay runtime"
+  else
+    uo_info "PASS: PID $PID is using the stock runtime and the recorded stock probe was clean"
+  fi
 elif [[ "$status" == "blocked" ]]; then
   uo_die "PID $PID is using stock or mixed CrossOver runtime; close it and relaunch UaRO CrossOver Patcher.app"
 else

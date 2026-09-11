@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Reorganized the CrossOver Skill around fresh-session routing, a numbered progress table, and explicit Phase A–E gates modeled on the mature Whisky workflow.
+- Documented the candidate-artifact prerequisite for the stock probe, the clean-stock branch with no overlay, and the distinction between diagnostic repair and `repair --fix`.
+- Allowed launcher creation and live verification to use stock CrossOver Wine when the recorded baseline is clean, while keeping stock/mixed routes blocked after an affected baseline.
 - Implemented the 0.2.0 experimental artifact-import flow, schema-2 manifests, PE/source-patch validation, and a source-build fallback path.
 - Replaced byte-only OpenSetup patching with the hash-locked `gepard-crossover-26.3.0` profile; the older four-byte Site B variant is no longer production code.
 - Made raw-input probe exit status semantic, copied CrossOver `lib/perl`/optional `lib64`, anchored overlay `ntdll.so` to the local runtime, and made overlay creation atomic.

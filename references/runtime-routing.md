@@ -14,5 +14,6 @@ UaRO CrossOver Patcher.app
   -> after-probe/runtime anchor required
 ```
 
-Use `scripts/uaro-crossover.zsh verify-live-runtime --bottle NAME --json` while uaRO is running. `lsof` is supplementary; `vmmap`, `WINEDEBUG=+loaddll`, the overlay manifest, and the live path anchor are the primary evidence. A process that is not running is `unconfirmed`, not proof that the fix failed.
+There are two valid runtime branches. If the stock probe recorded `AFFECTED=no` and `CLOBBERED=0`, no overlay is required: the generated launchers may use CrossOver's stock Wine and live verification accepts `runtime=stock` with `status=pass`. If the baseline recorded `AFFECTED=yes`, stock and mixed routes remain blocked; the Patcher must load the verified per-bottle overlay and live verification must report `runtime=overlay` with `status=pass`.
 
+Use `scripts/uaro-crossover.zsh verify-live-runtime --bottle NAME --json` while uaRO is running. `lsof` is supplementary; `vmmap`, `WINEDEBUG=+loaddll`, the overlay manifest, and the live path anchor are the primary evidence. A process that is not running is `unconfirmed`, not proof that the fix failed.
