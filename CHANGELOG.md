@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Added a fresh-session execution contract with explicit repository-reference loading, variable-ledger rules, pre-flight JSON field mapping, bottle discovery, and fresh/existing/verify/repair route selection.
+- Clarified that the Patcher is the client-update entry point, Gecko may require an interactive bottle marker step, and generic repair only audits or repairs generated launchers.
 - Reorganized the CrossOver Skill around fresh-session routing, a numbered progress table, and explicit Phase A–E gates modeled on the mature Whisky workflow.
 - Documented the candidate-artifact prerequisite for the stock probe, the clean-stock branch with no overlay, and the distinction between diagnostic repair and `repair --fix`.
 - Allowed launcher creation and live verification to use stock CrossOver Wine when the recorded baseline is clean, while keeping stock/mixed routes blocked after an affected baseline.

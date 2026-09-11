@@ -55,6 +55,13 @@ if ! has_text 'runtime_mode' "$ROOT/scripts/build-launchers.zsh"; then
   exit 1
 fi
 
+for marker in 'Fresh-session execution contract' 'CX_BUILD' 'Verify-only existing installation' 'repair --bottle' 'Patcher.*client' 'allow-missing-installer'; do
+  if ! has_text "$marker" "$ROOT/SKILL.md"; then
+    print -u2 -- "ERROR: Skill execution contract marker is missing: $marker"
+    exit 1
+  fi
+done
+
 if has_text 'Game\.app' "$ROOT/scripts/build-launchers.zsh"; then
   print -u2 -- "ERROR: the first launcher release must not generate Game.app"
   exit 1

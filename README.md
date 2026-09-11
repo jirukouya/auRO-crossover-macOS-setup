@@ -41,6 +41,8 @@ CrossOver's desktop app already bundles the interfaces used by this workflow, in
 
 You drive this by talking to an AI. Open this repository as the working folder in a local coding session, then use one of the following paths.
 
+For a fresh AI session, provide the repository rather than copying `SKILL.md` alone. The AI should read the Skill, this README, `references/crossover-cli.md`, and `references/state-schema.md`, then run the relevant script's `--help` and pre-flight before it creates or changes a bottle. The Skill maps pre-flight JSON into an explicit variable ledger, so missing installer, artifact, bottle, or CrossOver state is reported as a gate instead of being guessed.
+
 ### Option A — Desktop app (recommended)
 
 Use Claude Code, ChatGPT/Codex, or GitHub Copilot and paste:

@@ -5,18 +5,43 @@ description: >-
   Install, repair, verify, or uninstall uaRO on Apple Silicon macOS using
   CrossOver's bundled CLI and private bottles. Trigger when the user mentions
   uaRO with CrossOver, CrossOver bottles or Wine, Gepard T Code 3::110::12 on
-  CrossOver, wow64win.dll, or a fully automated CrossOver setup. Do not use
-  this skill for Whisky-only installations. When this file is handed to a
-  fresh AI session, read it once, route the task, and execute the numbered
-  steps in order.
-compatibility: Apple Silicon macOS; initial tested target CrossOver 26.3.0.39832; requires zsh, Python 3, CrossOver, and a user-supplied uaRO installer.
+  CrossOver, wow64win.dll, or a fully automated CrossOver setup, even if the
+  user does not explicitly say “use a Skill.” Do not use this skill for
+  Whisky-only installations. When this file is handed to a fresh AI session,
+  read it once, load the required repository references, route the task, and
+  execute the numbered steps in order.
+compatibility: Apple Silicon macOS; initial tested target CrossOver 26.3.0.39832; requires zsh, Python 3, CrossOver, the repository scripts/references, and a user-supplied uaRO installer.
 ---
 
 # uaRO on macOS via CrossOver — Full Install Skill
 
 This skill is the executable runbook for installing, repairing, verifying, and uninstalling uaRO through CrossOver on Apple Silicon macOS.
 
-It is written for a fresh AI session. Read the whole file once, then follow the routing table and numbered steps. Do not invent paths, build numbers, hashes, bottle names, installer members, or artifact provenance.
+It is a repository-level runbook, not a standalone installer. The commands below are the authoritative execution path; the repository scripts and references provide the implementation contract. Read the whole file once, load only the relevant supporting files listed in the Fresh-session contract, then follow the routing table and numbered steps. Do not invent paths, build numbers, hashes, bottle names, installer members, or artifact provenance.
+
+## 0. Fresh-session execution contract
+
+Before changing anything, do these actions in order:
+
+1. Read `README.md`, `references/crossover-cli.md`, `references/state-schema.md`, and the reference matching the route: `runtime-routing.md` for runtime decisions, `raw-input-fix.md` for artifact/probe work, or `troubleshooting.md` for a symptom. Do not load every large reference by default.
+2. Run the relevant command with `--help` before using it. Some commands support `--json`; others intentionally do not. Do not add undocumented flags.
+3. Create a variable ledger. Every variable used in a later command must have a value, source, and status (`PASS`, `UNCONFIRMED`, or `BLOCKED`). Do not paste placeholder values into a command.
+4. Treat the default bottle name `uaro-crossover` as a proposal from the scripts, not as proof that it is the user's intended bottle.
+5. If the user supplied only this file and not the repository, installer, artifact, or local CrossOver state, stop and explain that the Skill cannot execute without those inputs.
+
+For a JSON pre-flight result, use these exact keys to populate the ledger:
+
+| Ledger value | Pre-flight JSON key | Status rule |
+|---|---|---|
+| CROSSOVER_APP | `crossover_app` | PASS only when the path exists and belongs to the resolved build |
+| CX_VERSION | `crossover_version` | PASS when read from the current app |
+| CX_BUILD | `crossover_build` | PASS only when it matches the supported build or a matching artifact is verified |
+| BOTTLE_NAME | `bottle` | PASS after user choice or an unambiguous existing-state match |
+| BOTTLE_PATH | `bottle_dir` | PASS when the returned path exists; absent is expected before a fresh bottle is created |
+| INSTALLER_SOURCE | `installer_source` | PASS only when installer status is complete |
+| RAWINPUT_SOURCE_DIR | `rawinput_source_dir` | PASS only when the source report is candidate/valid |
+
+The state file is `STATE_FILE=$HOME/Library/Application Support/uaRO-CrossOver/state.json`. Read it before resuming an existing installation, but never treat a previous state entry as proof that the current bottle or files still exist.
 
 ## Contents
 
@@ -40,6 +65,8 @@ It is written for a fresh AI session. Read the whole file once, then follow the 
 |---|---|
 | Fresh CrossOver installation | Run Pre-flight, then Steps 1–12 in order. |
 | Existing or partial installation | Run Pre-flight and existing-state detection first; resume only from a verified checkpoint. |
+| Verify-only request or “is it fixed?” | Read state, run live verification/diagnosis, and do not create or patch anything unless the user later requests repair. |
+| Repair request | Audit launchers first; use `--fix` only for the launcher repair scope explicitly confirmed by the user. |
 | Gepard T Code 3::110::12, raw-input, wow64win.dll, or map-time crash | Inspect the live route; separate installer/setup issues from runtime overlay issues. |
 | Settings or setup.exe problem | Work in Phase C; do not rebuild the raw-input overlay unless the probe requires it. |
 | Uninstall request | Confirm the exact game directory or bottle, then use the scoped uninstall route. |
@@ -51,9 +78,20 @@ At the beginning of a new task:
 
 1. Identify whether the user wants CrossOver, Whisky, or both. If it is Whisky-only, stop this skill.
 2. State the current route: fresh install, existing state, repair, verify, or uninstall.
-3. Run Pre-flight before making any bottle, game, artifact, or launcher change.
-4. Re-derive every path from actual command output. Never reuse a path from memory or from an old report.
-5. Use the progress table below. After each phase, report what passed, what is unconfirmed, and the next action; stop and ask before continuing to the next phase. Always stop at a human GUI, credential, permission, destructive, or live-game gate.
+3. Read the repository references required by that route and run the relevant script help output.
+4. Run Pre-flight before making any bottle, game, artifact, or launcher change.
+5. Re-derive every path from actual command output. Never reuse a path from memory or from an old report.
+6. Use the progress table below. After each phase, report what passed, what is unconfirmed, and the next action; stop and ask before continuing to the next phase. Always stop at a human GUI, credential, permission, destructive, or live-game gate.
+
+Route-specific first action:
+
+| Route | First action | Next decision |
+|---|---|---|
+| Fresh install | Run Pre-flight with the installer input and raw-input source when available. | If the intended bottle does not exist, create it in Step 3; do not treat a missing status result as an installation failure. |
+| Existing/partial | Read state, run Pre-flight with `--allow-missing-installer` only when appropriate, then run bottle status. | Resume only after matching the state path to the current bottle and game files. |
+| Verify-only | Run `verify-live-runtime`; add `diagnose --error` when the user supplied an exact symptom. | Report `PASS`, `UNCONFIRMED`, or `BLOCKED`; do not mutate state except the normal verification record. |
+| Repair | Run diagnostic `repair` without `--fix`. | Use `--fix` only after confirming that the requested repair is limited to generated launchers. |
+| Uninstall | Resolve the exact game directory or bottle and show the final target path. | Require explicit scope and `--confirm` immediately before moving/deleting. |
 
 ## 2. Operating principles
 
@@ -113,18 +151,28 @@ Use these variables only after resolving them from the current machine:
 | WIDTH, HEIGHT | User choice or current configuration | Explicitly confirm before writing game settings |
 | OVERLAY_DIR | Build output and state | Required only when the baseline is affected |
 | ERROR_TEXT | Exact user-reported symptom | Required when calling diagnose |
+| PREFLIGHT_JSON | Temporary capture of JSON pre-flight output | Read-only ledger input; delete or leave in `/tmp` after the run |
+| STATE_FILE | User-local state path | Never commit or upload this file |
 
 When a command prints a path, copy that exact path into the next command. Do not reconstruct macOS paths from a report.
 
 ## 5. Pre-flight and existing-state detection
 
-Run from the repository root:
+Run from the repository root. The command blocks below are templates: do not run a command until every variable on that line has a ledger value. If the installer or artifact source is not known yet, begin with host-only discovery:
 
 ~~~zsh
-scripts/uaro-crossover.zsh preflight --json
+PREFLIGHT_JSON="/tmp/uaro-crossover-preflight.json"
+scripts/uaro-crossover.zsh preflight --bottle uaro-crossover --allow-missing-installer --json | tee "$PREFLIGHT_JSON"
 ~~~
 
-If the installer ZIP or extracted installer directory is already known, include one of:
+For a fresh installation with a known installer and raw-input source, prefer a single JSON pre-flight so the AI can build its ledger from one result:
+
+~~~zsh
+PREFLIGHT_JSON="/tmp/uaro-crossover-preflight.json"
+scripts/uaro-crossover.zsh preflight --bottle "$BOTTLE_NAME" --installer-zip "$INSTALLER_ZIP" --rawinput-source-dir "$RAWINPUT_SOURCE_DIR" --json | tee "$PREFLIGHT_JSON"
+~~~
+
+If only one installer input is known, use the matching form:
 
 ~~~zsh
 scripts/uaro-crossover.zsh preflight --installer-zip "$INSTALLER_ZIP" --json
@@ -139,6 +187,30 @@ scripts/uaro-crossover.zsh preflight --installer-zip "$INSTALLER_ZIP" --rawinput
 
 Use --allow-missing-installer only for host-only diagnosis or when the user has explicitly chosen to complete installer staging later. It does not make installation ready.
 
+Read the JSON result and populate the ledger from the exact keys in Section 0. In particular, set `CX_VERSION` from `crossover_version`, `CX_BUILD` from `crossover_build`, `BOTTLE_PATH` from `bottle_dir`, and keep `INSTALLER_SOURCE`/`RAWINPUT_SOURCE_DIR` tied to the paths that actually passed. If you did not save JSON, use the human-readable output and do not pretend that shell variables were automatically assigned.
+
+When JSON was saved, print the ledger candidates without evaluating them as shell code:
+
+~~~zsh
+python3 - "$PREFLIGHT_JSON" <<'PY'
+import json
+import sys
+
+data = json.loads(open(sys.argv[1], encoding="utf-8").read())
+for ledger, key in {
+    "CROSSOVER_APP": "crossover_app",
+    "CX_VERSION": "crossover_version",
+    "CX_BUILD": "crossover_build",
+    "BOTTLE_NAME": "bottle",
+    "BOTTLE_PATH": "bottle_dir",
+    "INSTALLER_SOURCE": "installer_source",
+    "RAWINPUT_SOURCE_DIR": "rawinput_source_dir",
+}.items():
+    value = data.get(key)
+    print(f"{ledger}={value if value is not None else '<missing>'}")
+PY
+~~~
+
 Pre-flight must resolve or clearly report:
 
 - Apple Silicon architecture and Rosetta availability.
@@ -148,13 +220,21 @@ Pre-flight must resolve or clearly report:
 - Whether the installer input exists and passes the expected member-name checks.
 - Whether an artifact package is present and can be verified.
 
-After pre-flight, inspect existing state:
+After pre-flight, inspect existing state only when the user says an installation or bottle already exists, or when the pre-flight result says the bottle is present:
 
 ~~~zsh
 scripts/uaro-crossover.zsh bottle status --bottle "$BOTTLE_NAME"
 ~~~
 
-If the bottle name is not known, list actual bottles first and ask the user to choose when more than one plausible bottle exists.
+For a fresh installation with no existing bottle, skip this status command and continue to Step 3's `bottle create`. If the bottle name is not known, list the actual directories first:
+
+~~~zsh
+find "$HOME/Library/Application Support/CrossOver/Bottles" -mindepth 1 -maxdepth 1 -type d -print
+~~~
+
+Ask the user to choose when more than one plausible bottle exists. Never choose a bottle only because it has the default name.
+
+For an existing installation, use state only as a resume hint. If the state says the installer is complete and the recorded `GAME_DIR` still contains the game, skip Steps 3–5. Re-run Step 6 when the recorded setup path or hash no longer matches; re-run Step 7 when Gecko/configuration evidence is absent; re-run Step 8 when the recorded bottle, CrossOver build, artifact, or probe log no longer matches the current machine. Never skip a checkpoint solely because an old state entry says `pass`.
 
 ## 6. Phase A — host and artifact readiness
 
@@ -245,7 +325,7 @@ For an extracted installer directory, use:
 scripts/uaro-crossover.zsh install --bottle "$BOTTLE_NAME" --installer-dir "$INSTALLER_DIR"
 ~~~
 
-The user must complete the installer GUI, choose the intended game directory, and handle any CrossOver/macOS permission prompt. The AI must not enter or request game credentials.
+The user must complete the installer GUI, choose the intended game directory, and handle any CrossOver/macOS permission prompt. The AI must not enter or request game credentials. The Patcher launcher is the later client-update entry point; there is no separate client-update shell command in this repository. If a client update replaces the installed `setup.exe`, rerun Step 6 before live verification.
 
 After the GUI finishes, resolve the actual installed directory:
 
@@ -285,7 +365,7 @@ Check the bottle's Gecko state:
 scripts/uaro-crossover.zsh check-gecko --bottle "$BOTTLE_NAME" --json
 ~~~
 
-If Gecko is missing, let CrossOver install it through its own supported path and re-run the check. Do not copy a random Gecko bundle.
+If the CrossOver Gecko payload itself is missing, stop and ask the user to install the matching Gecko component through CrossOver, then rerun this check. Do not copy a random Gecko bundle. If the payload exists but the selected bottle has no Gecko marker, mark Step 7 pending and use the Patcher route to let CrossOver install Gecko interactively. Use an existing generated Patcher launcher when available; for a fresh install, it is safe to defer this one check until the launchers in Step 11 exist. Rerun `check-gecko` before Step 12.
 
 Write the requested game resolution explicitly:
 
@@ -375,7 +455,7 @@ Only these launchers are supported:
 - UaRO CrossOver Patcher.app
 - UaRO CrossOver Settings.app
 
-The Patcher launcher applies setup.exe patch verification as needed before the game starts. It is the only supported game-launch route after an overlay has been deployed. No direct Game.app launcher is generated.
+The Patcher launcher runs the client Patcher and applies `setup.exe` patch verification as needed before the game starts; there is no separate update shell command. It is the only supported game-launch route after an overlay has been deployed. No direct Game.app launcher is generated. If the client Patcher changes the installed files, treat that as a mutation and rerun Step 6 before live verification.
 
 ### Step 12 — Verify the live runtime
 
@@ -392,7 +472,7 @@ Accepted completion states:
 
 A running process with no readable runtime evidence is UNCONFIRMED. If the baseline was affected, runtime=stock or runtime=mixed is BLOCKED.
 
-For diagnosis:
+For diagnosis, provide the exact user-reported symptom:
 
 ~~~zsh
 scripts/uaro-crossover.zsh diagnose --bottle "$BOTTLE_NAME" --error "$ERROR_TEXT" --json
@@ -444,9 +524,26 @@ Treat a missing file, unknown hash, wrong build, wrong installer member, or mixe
 
 ## 12. Repair, rollback, and uninstall
 
+### Verify-only existing installation
+
+For a user who asks whether an existing installation is working, do not reinstall or rebuild first:
+
+~~~zsh
+scripts/uaro-crossover.zsh bottle status --bottle "$BOTTLE_NAME"
+scripts/uaro-crossover.zsh verify-live-runtime --bottle "$BOTTLE_NAME" --game-dir "$GAME_DIR" --json
+~~~
+
+If the user supplied an exact error, add:
+
+~~~zsh
+scripts/uaro-crossover.zsh diagnose --bottle "$BOTTLE_NAME" --error "$ERROR_TEXT" --json
+~~~
+
+Use the state file and current filesystem paths to decide which completed checkpoint can be resumed. A verify-only route must not create a bottle, patch `setup.exe`, import an artifact, build an overlay, or rebuild launchers.
+
 ### Repair is diagnostic by default
 
-This command checks state and reports repair candidates. It does not perform mechanical fixes:
+This command audits the two generated launcher bundles: shell syntax, Info.plist, bundled patch helper/profile, and code signature. It does not patch the game, rebuild an overlay, rerun the raw-input probe, or repair Gecko:
 
 ~~~zsh
 scripts/uaro-crossover.zsh repair --bottle "$BOTTLE_NAME"
@@ -458,7 +555,9 @@ Only use --fix when the user has explicitly asked to repair and the target scope
 scripts/uaro-crossover.zsh repair --bottle "$BOTTLE_NAME" --fix
 ~~~
 
-Before --fix, record the current state and confirm the bottle, game directory, artifact, and intended repair scope. After --fix, rerun the relevant probe, artifact, launcher, and live-runtime checks. A repair report alone is not proof of a working installation.
+Before --fix, record the current state and confirm that the requested scope is limited to generated launchers. `--fix` refreshes the bundled patch helper/profile, restores executable permission, and re-signs the launcher. After --fix, rerun launcher verification and the relevant setup, artifact, probe, and live-runtime checks. A repair report alone is not proof of a working installation.
+
+For other repair scopes, use the narrow command that owns that evidence: rerun `patch-setup` for `setup.exe`, `check-gecko` for Gecko, `configure` for game settings, and `overlay verify` plus the after-probe for an overlay. Do not assume the generic `repair` command handles those areas.
 
 ### Rollback
 
