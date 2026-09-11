@@ -174,6 +174,15 @@ This is unofficial software and runs at your own risk:
 - The overlay does not automatically follow future CrossOver runtime updates and consumes additional disk space.
 - The workflow does not collect, transmit, or store uaRO credentials. Account login, installer download, macOS prompts, and final in-game verification remain directly under your control.
 
+## Contributors & Thanks
+
+This CrossOver workflow exists because of the time, testing, and technical work shared by two contributors in the uaRO Discord community:
+
+- **Rhya** — tested the CrossOver setup in practice alongside a5mod3us's fix, confirmed that it could launch and run uaRO, and provided hands-on feedback about performance and macOS quality-of-life behavior. [Original Discord message](https://discord.com/channels/702960460168953946/1463912027461386424/1538344442103070761)
+- **a5mod3us** — investigated the root cause of `Gepard::T Code: 3::110::12`, identified the Wine raw-input bug, and shared the patch, detector probe, and CrossOver 26.3.0 `wow64win.dll` artifact that made this workflow possible. [Original Discord message](https://discord.com/channels/702960460168953946/1463912027461386424/1538224136776589332)
+
+Thank you both for sharing your research, fixes, and testing time with the uaRO community. This repository builds on that work and is intended to acknowledge it clearly.
+
 ## Acknowledgments
 
 - The uaRO community members who investigated the CrossOver raw-input issue and shared the probe, source patch, OpenSetup patcher, and experimental build-specific artifact.
