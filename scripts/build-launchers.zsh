@@ -44,7 +44,20 @@ if (( ! OVERLAY_REQUESTED )); then
 fi
 RUNTIME_MODE=""
 WINE_CMD=""
-if [[ -n "$OVERLAY_DIR" ]]; then
+CX_DLL="$CX_ROOT/lib/wine/x86_64-windows/wow64win.dll"
+ARTIFACT_DIR="$(uo_state_get raw_input.artifact_dir 2>/dev/null || true)"
+ARTIFACT_DIR="${ARTIFACT_DIR:-$HOME/Games/UaRO-CrossOver-artifacts}"
+ICON_FILE="${SCRIPT_DIR:h}/references/icons/AppIcon.icns"
+APP_DLL_MATCH=0
+if [[ -f "$CX_DLL" && -f "$ARTIFACT_DIR/wow64win.dll" ]] && \
+   [[ "$(uo_hash "$CX_DLL")" == "$(uo_hash "$ARTIFACT_DIR/wow64win.dll")" ]]; then
+  APP_DLL_MATCH=1
+fi
+if (( APP_DLL_MATCH )); then
+  WINE_CMD="$CX_WINE"
+  RUNTIME_MODE="stock"
+  uo_info "INFO: Option A CrossOver.app DLL matches the artifact; launchers use official wine"
+elif [[ -n "$OVERLAY_DIR" ]]; then
   OVERLAY_DIR="$(uo_realpath "$OVERLAY_DIR")" || uo_die "overlay directory does not exist: $OVERLAY_DIR"
   [[ "$(uo_state_get overlay_probe_after 2>/dev/null || true)" == "pass" ]] || \
     uo_die "overlay has not passed the after-probe; refusing to create launchers"
@@ -105,12 +118,15 @@ create_launcher() {
   cp "$SCRIPT_DIR/setup_profiles.py" "$resources_dir/setup_profiles.py"
   python3 - "$macos_dir/$executable_name" "$bundle/Contents/Info.plist" \
     "$display_name" "$bundle_id" "$executable_name" "$BOTTLE_NAME" "$GAME_DIR" \
-    "$WINE_CMD" "$RUNTIME_MODE" "$app_win" "$SETUP_WIN" "$SETUP_PATH" <<'PY'
+    "$WINE_CMD" "$RUNTIME_MODE" "$app_win" "$SETUP_WIN" "$SETUP_PATH" \
+    "$ICON_FILE" "$resources_dir" <<'PY'
 import plistlib
+import shutil
 import sys
 from pathlib import Path
 
-launcher_path, plist_path, display, bundle_id, executable, bottle, game_dir, wine, runtime_mode, app_win, setup_win, setup_path = sys.argv[1:]
+(launcher_path, plist_path, display, bundle_id, executable, bottle, game_dir, wine,
+ runtime_mode, app_win, setup_win, setup_path, icon_file, resources_dir) = sys.argv[1:]
 launcher = r'''#!/bin/zsh
 set -euo pipefail
 MACOS_DIR="${0:A:h}"
@@ -133,8 +149,7 @@ LAUNCH_LOG="$LOG_DIR/launcher-$(date +%Y%m%d-%H%M%S).log"
 cd "$GAME_DIR"
 python3 "$PATCH_SCRIPT" --setup "$SETUP_PATH" --state-file "$STATE_FILE"
 print -- "launcher=$0 bottle=$BOTTLE_NAME game_dir=$GAME_DIR wine=$WINE_CMD" | tee "$LAUNCH_LOG"
-"$WINE_CMD" --bottle "$BOTTLE_NAME" --workdir "$GAME_DIR" --cx-app "$APP_WIN" >>"$LAUNCH_LOG" 2>&1 &
-CHILD_PID=$!
+CHILD_PID=$$
 python3 - "$STATE_FILE" "$0" "$CHILD_PID" "$LAUNCH_LOG" "$GAME_DIR" "$WINE_CMD" "$RUNTIME_MODE" <<'STATEPY'
 import json, os, sys, tempfile
 from datetime import datetime, timezone
@@ -153,20 +168,23 @@ with os.fdopen(fd, "w", encoding="utf-8") as handle:
 os.replace(tmp, path)
 STATEPY
 print -- "PID=$CHILD_PID; verify with: uaro-crossover.zsh verify-live-runtime --bottle $BOTTLE_NAME --json"
-set +e
-wait "$CHILD_PID"
-RC=$?
-set -e
-python3 - "$STATE_FILE" "$RC" <<'EXITPY'
-import json, sys
-from pathlib import Path
-path, rc = sys.argv[1:]
-try: state = json.loads(Path(path).read_text(encoding="utf-8"))
-except (FileNotFoundError, json.JSONDecodeError): state = {}
-state.setdefault("launch", {})["last_exit_code"] = int(rc)
-Path(path).write_text(json.dumps(state, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-EXITPY
-exit "$RC"
+# CrossOver's bin/wine often returns immediately. Exiting then looks like a
+# flash-quit and can SIGHUP Patcher. Detach Wine, then stay alive while
+# Patcher.exe or uaRO.exe is running so this .app does not flash-quit.
+"$WINE_CMD" --bottle "$BOTTLE_NAME" --workdir "$GAME_DIR" --cx-app "$APP_WIN" >>"$LAUNCH_LOG" 2>&1 &!
+seen=0
+for ((i=0; i<180; i++)); do
+  if pgrep -f 'UaRo Patcher.exe' >/dev/null 2>&1 || pgrep -f '[\\]uaRO.exe' >/dev/null 2>&1; then
+    seen=1
+    sleep 2
+    continue
+  fi
+  if (( seen )); then
+    break
+  fi
+  sleep 1
+done
+exit 0
 '''
 for token, value in {
     "__GAME_DIR__": game_dir,
@@ -187,11 +205,17 @@ plist = {
     "CFBundleInfoDictionaryVersion": "6.0",
     "CFBundleName": display,
     "CFBundlePackageType": "APPL",
-    "CFBundleShortVersionString": "0.2.1",
-    "CFBundleVersion": "0.2.1",
+    "CFBundleShortVersionString": "0.2.3",
+    "CFBundleVersion": "0.2.3",
     "LSMinimumSystemVersion": "13.0",
     "NSHighResolutionCapable": True,
 }
+icon_src = Path(icon_file)
+if icon_src.is_file():
+    dest = Path(resources_dir) / "AppIcon.icns"
+    shutil.copy2(icon_src, dest)
+    plist["CFBundleIconFile"] = "AppIcon"
+    plist["CFBundleIconName"] = "AppIcon"
 with open(plist_path, "wb") as handle:
     plistlib.dump(plist, handle, sort_keys=False)
 PY

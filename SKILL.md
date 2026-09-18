@@ -1,6 +1,6 @@
 ---
 name: auro-crossover-macos-setup
-version: 0.2.3-experimental
+version: 0.2.4-experimental
 description: >-
   Install, repair, verify, or uninstall uaRO on Apple Silicon macOS using
   CrossOver. Trigger when this GitHub repo or SKILL.md is handed to a fresh
@@ -488,7 +488,7 @@ Do not use `/Applications/uaRO/` Whisky experiment bundles. Optional generated a
 scripts/uaro-crossover.zsh build-launchers --bottle "$BOTTLE_NAME" --game-dir "$GAME_DIR"
 ~~~
 
-Missing `.icns` is normal. `repair` only audits launcher scripts/signatures; it does not prove the game starts.
+`build-launchers` embeds `references/icons/AppIcon.icns` and signs the bundle. Confirmed working: official CrossOver wine after Option A, wait while Patcher/uaRO run, then codesign. Do not `exec` Wine as the `.app` (Dock bounce). Do not start Wine and `exit 0` (flash quit). Do not add icons by editing Resources on a signed app. `repair` only audits launcher scripts/signatures; it does not prove the game starts.
 
 Supported launch after Option A:
 

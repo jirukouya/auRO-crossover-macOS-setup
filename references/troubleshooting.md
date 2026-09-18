@@ -10,7 +10,7 @@ Inspect live `uaRO.exe` with `lsof` for `wow64win.dll`. After Option A, the path
 
 ## Game never starts / Dock “Running in Background”
 
-Confirm Gravity registry exists; if not, `launch-setup` and click OK. Launch with `launch-patcher` (official wine), not `/Applications/uaRO/` and not a Game.app. Generated `.app` bundles have no custom icon; that is normal. `repair` PASS does not mean the game starts.
+Confirm Gravity registry exists; if not, `launch-setup` and click OK. Prefer `launch-patcher` (official wine) or the generated Patcher.app rebuilt by `build-launchers` (includes `references/icons/AppIcon.icns`). Do not paste an `.icns` into an already-signed app without rebuilding. A Dock icon that bounces forever means the wrapper `exec`’d Wine (no Cocoa window). An app that flashes and quits means the wrapper exited as soon as `bin/wine` returned. Rebuild with current `build-launchers.zsh`. `repair` PASS does not mean the game starts.
 
 ## Other Gepard errors
 

@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [0.2.4-experimental] - 2026-09-18
+
+- Ship `references/icons/AppIcon.icns` in generated Patcher/Settings apps.
+- Launchers use official CrossOver wine when Option A is in place; stay running while Patcher/uaRO live (no `exec`, no instant `exit 0`). Document that hand-editing icons breaks codesign.
+
 ## [0.2.3-experimental] - 2026-09-18
 
 - Public first-run: SKILL/README tell a fresh AI to clone, search for installer + gepard-crossover-fix, use default bottle/cache names, and start executing without loading every reference first.

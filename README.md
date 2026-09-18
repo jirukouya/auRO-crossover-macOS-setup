@@ -83,7 +83,7 @@ The AI will guide these phases:
 | 4. Raw-input route | Runs the stock probe. Affected baselines default to Option A (`deploy-app`) into CrossOver.app; overlay is optional. | Supply the gepard-crossover-fix package (keep `wow64win.dll.crossover-26.3.0` as the human name). |
 | 5. OpenSetup + launch | Launch patched `setup.exe` until Gravity registry exists, then `launch-patcher`. | Click OK in OpenSetup; then Patcher Play / login. |
 
-The generated Patcher/Settings `.app` bundles have no custom icon; that is normal. Do not use `/Applications/uaRO/` Whisky experiment launchers. It does not generate a direct Game launcher.
+`build-launchers` copies `references/icons/AppIcon.icns` into both `.app` bundles and signs them. Do not hand-edit the bundle to “add an icon”; that breaks codesign and can make Play look dead. The working pattern (confirmed on the maintainer Mac) is: Option A official CrossOver `bin/wine`, keep the `.app` alive while `UaRo Patcher.exe` / `uaRO.exe` run, then `codesign`. Do not `exec` Wine as the bundle executable (Dock bounce with no window) and do not `exit 0` immediately after starting Wine (looks like a crash). Do not use `/Applications/uaRO/` Whisky experiment launchers. No Game.app.
 
 ```zsh
 scripts/uaro-crossover.zsh preflight \
