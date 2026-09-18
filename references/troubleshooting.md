@@ -8,9 +8,9 @@ Inspect the installed `setup.exe`, not `UaRO_Setup.exe`. Confirm its full SHA-25
 
 Inspect live `uaRO.exe` with `lsof` for `wow64win.dll`. After Option A, the path must be inside CrossOver.app and the hash must match `deploy-app`. If lsof still shows the stock `.orig` file, review the shared-app impact and re-run `deploy-app --confirm-app-change`. Overlay probe PASS with no live process is not a fix. If the baseline was never affected, a remaining T-code is not proof that a DLL overlay is needed. Do not patch Gepard itself.
 
-## Game never starts / Dock “Running in Background”
+## Game never starts / macOS says “App Running in Background”
 
-Confirm Gravity registry exists; if not, `launch-setup` and click OK. Prefer `launch-patcher` (official wine) or the generated Patcher.app rebuilt by `build-launchers` (includes `references/icons/AppIcon.icns`). Do not paste an `.icns` into an already-signed app without rebuilding. A Dock icon that bounces forever means the wrapper `exec`’d Wine (no Cocoa window). An app that flashes and quits means the wrapper exited as soon as `bin/wine` returned. Rebuild with current `build-launchers.zsh`. `repair` PASS does not mean the game starts.
+Show the user the Settings SOP: 2560×1600, DirectX 9, and Restrict mouse to window off. The skill does not inspect `user.reg` or claim those choices were machine-verified. Rebuild the Patcher/Settings launchers with current `build-launchers.zsh`; they must use CrossOver `--wait-children`, include `LSUIElement=true`, and exit when the requested Windows program exits. Do not paste an `.icns` into an already-signed app without rebuilding. A lingering background notice indicates an old launcher bundle or detached Wine process; check `~/Applications/UaRO CrossOver *.app` and run `repair`. `repair` PASS does not mean the game starts.
 
 ## Other Gepard errors
 

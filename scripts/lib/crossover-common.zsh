@@ -159,7 +159,7 @@ state.update({
     "crossover_build": cx_build,
     "bottle": bottle,
 })
-for section in ("installer", "setup", "gecko", "raw_input", "launchers"):
+for section in ("installer", "setup", "gecko", "raw_input", "registration", "launchers"):
     state.setdefault(section, {})
 if game_dir:
     state["game_dir"] = game_dir

@@ -5,11 +5,12 @@ SCRIPT_DIR="${0:A:h}"
 source "$SCRIPT_DIR/lib/crossover-common.zsh"
 
 BOTTLE_NAME="uaro-crossover"
-APPLICATIONS_DIR="/Applications"
+APPLICATIONS_DIR="$HOME/Applications"
 FIX=0
 
 usage() {
   print "Usage: repair.zsh --bottle NAME [--applications-dir DIR] [--fix]"
+  print "Audits CrossOver registration and the two supported user-level launchers; --fix repairs both scopes."
 }
 
 while (( $# )); do
@@ -27,6 +28,13 @@ uo_resolve_crossover
 uo_require_supported_build
 uo_require_arm64_rosetta
 uo_require_bottle
+
+REGISTRATION_STATUS=0
+if (( FIX )); then
+  zsh "$SCRIPT_DIR/verify-registration.zsh" --bottle "$BOTTLE_NAME" --applications-dir "$APPLICATIONS_DIR" --repair || REGISTRATION_STATUS=$?
+else
+  zsh "$SCRIPT_DIR/verify-registration.zsh" --bottle "$BOTTLE_NAME" --applications-dir "$APPLICATIONS_DIR" --json >/dev/null || REGISTRATION_STATUS=$?
+fi
 
 failures=0
 for display_name in "UaRO CrossOver Patcher" "UaRO CrossOver Settings"; do
@@ -72,10 +80,16 @@ for display_name in "UaRO CrossOver Patcher" "UaRO CrossOver Settings"; do
     failures=$(( failures + 1 ))
     continue
   }
+  ui_element="$(plutil -extract LSUIElement raw -o - "$plist" 2>/dev/null || true)"
+  [[ "$ui_element" == "true" ]] || {
+    uo_warn "launcher is not configured as an on-demand UI element: $bundle"
+    failures=$(( failures + 1 ))
+    continue
+  }
   uo_info "PASS: verified launcher $bundle"
 done
 
-if (( failures )); then
+if (( failures || REGISTRATION_STATUS )); then
   uo_write_state repair failed
   exit 1
 fi

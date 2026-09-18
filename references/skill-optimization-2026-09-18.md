@@ -1,5 +1,7 @@
 # Skill 优化方案（2026-09-18 试错）
 
+> Historical notes. The current Skill now uses official CrossOver `--wait-children` for on-demand Patcher/Settings launchers, sets `LSUIElement`, and treats Settings values as a user-facing SOP rather than a machine-verified gate. Do not reintroduce the old detached launcher loop or Gravity-registry hard gate from the historical notes below.
+
 本文件是下一轮改 `SKILL.md` / 脚本的清单。正本是 Discord 大佬包 `gepard-crossover-fix`（README、SKILL.md、SHARE-PROMPT.md、`wow64win.dll.crossover-26.3.0`、`patch_opensetup_rosetta.py`）。仓库 skill 是衍生安装器，部署规则不得盖过大佬包。
 
 证据：`~/my-agent/000_Agent/memory/daily/2026-09-18.md`。用户已确认游戏能启动。启动成功路径是 **Option A 换 CrossOver.app 的 DLL + OpenSetup 写 Gravity + 官方 wine --cx-app**，不是 overlay Patcher.app。

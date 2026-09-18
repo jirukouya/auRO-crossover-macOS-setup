@@ -11,7 +11,7 @@ Contents/SharedSupport/CrossOver/bin/wine
 Contents/SharedSupport/CrossOver/CrossOver-Hosted Application/cxbottle
 ```
 
-`wine --help` confirms `--bottle`, `--cx-app`, `--workdir`, `--wait`, and `--no-update`. `cxbottle --help` confirms `--bottle`, `--create`, `--template`, `--status`, and `--delete`.
+`wine --help` confirms `--bottle`, `--cx-app`, `--workdir`, `--wait`, and `--no-update`. `cxbottle --help` confirms `--bottle`, `--create`, `--template`, `--status`, `--install`, and `--delete`. `--install` exports the bottle's menu and association metadata; the skill verifies the resulting files instead of relying on a CrossOver window.
 
 The tools are not assumed to be on PATH. The resolver derives both paths from the selected CrossOver app and rejects ambiguous installations.
 

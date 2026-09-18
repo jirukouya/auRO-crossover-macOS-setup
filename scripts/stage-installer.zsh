@@ -137,6 +137,8 @@ print(json.dumps({"installer_stage": "complete", "game_dir": sys.argv[1], "insta
 PY
 )"
   uo_state_merge_json "$COMPLETION_JSON"
+  zsh "$SCRIPT_DIR/verify-registration.zsh" --bottle "$BOTTLE_NAME" --game-dir "$GAME_DIR" --repair || \
+    uo_die "CrossOver uaRO registration could not be proven; installation is blocked"
 else
   uo_info "PASS: installer siblings staged at $STAGE_DIR"
   uo_info "Next action: rerun with --run to open the interactive installer."

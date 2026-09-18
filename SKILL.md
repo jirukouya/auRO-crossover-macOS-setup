@@ -15,7 +15,7 @@ compatibility: Apple Silicon macOS; CrossOver 26.3.0 line (public 26.3 / 26.3.0,
 
 This file is meant to be handed to a fresh AI session (Claude Code, Codex, ChatGPT, Copilot, Grok) on a player's Mac, with no other context. Read it once, then execute. Commands live in `scripts/uaro-crossover.zsh`; do not invent hashes, bottle names, or installer downloads.
 
-This is not a theory rewrite. It is the procedure after a real Apple Silicon + CrossOver 26.3.0 run: overlay-only probe can pass while Play still dies; OpenSetup must write Gravity registry; Option A into CrossOver.app is the deploy that actually started the game. The maintainer confirmation used build 26.3.0.39832; any 26.3.0.* is allowed if probes pass.
+This is not a theory rewrite. It is the procedure after a real Apple Silicon + CrossOver 26.3.0 run: overlay-only probe can pass while Play still dies; first launch may require OpenSetup, so the skill shows the user the Settings SOP; Option A into CrossOver.app is the deploy that actually started the game. The maintainer confirmation used build 26.3.0.39832; any 26.3.0.* is allowed if probes pass.
 
 ## If this repo was just handed to you — start here
 
@@ -31,8 +31,19 @@ Do these in order. Do **not** first read every file under `references/`.
    - Option A will backup then replace `wow64win.dll` **inside CrossOver.app**
 3. Search this Mac for the installer and gepard folder (`~/Downloads`, `~/Documents`, `~/Games`, Desktop). If found, use those paths. If not, ask **once** for both paths. Do not invent downloads.
 4. Defaults unless a matching bottle already exists: `BOTTLE_NAME=uaro-crossover`, `ARTIFACT_DIR=$HOME/Games/UaRO-CrossOver-artifacts`. Do not stall on renaming them.
-5. Run host preflight from the repo root, then Steps 1–12. Post the progress table after each step. Stop only for: missing files, installer/OpenSetup GUI, macOS permission, login, or the user refusing Option A.
+5. Run host preflight from the repo root, then the internal Steps 1–12. Keep the technical progress table internally; for a beginner, show only the four-stage summary below. Stop only for: missing files, installer/OpenSetup GUI, macOS permission, login, or the user refusing Option A.
 6. If the user only pasted this SKILL.md without the repo, clone the repo first. The skill cannot run from this file alone.
+
+## Beginner-facing flow
+
+Present the workflow as four simple stages. The AI performs the technical checks silently and only exposes a blocker or a user action:
+
+1. **Install the game** — prepare CrossOver, create the private bottle, and complete the uaRO installer.
+2. **Create the two launch buttons** — generate Patcher and Settings under `~/Applications`; these are on-demand launchers, not resident apps.
+3. **Do first-time Settings** — show the three Settings values, let the user click OK, and close Settings. Do not inspect or guess the user's selections.
+4. **Start and test the game** — open Patcher, log in, enter the map, and run the final runtime check.
+
+Do not lead with hashes, plist paths, registry keys, or CrossOver internals. Keep those in the technical appendix and use them only when a stage is blocked.
 
 ## 0. Fresh-session execution contract
 
@@ -130,13 +141,13 @@ Maintain this table in the final report and update it during execution.
 | Step 2 | Artifact and installer inputs resolved | Artifact verification and installer path/member evidence |
 | Step 3 | Bottle resolved | Bottle status/create output |
 | Step 4 | Installer staged | Staged files and exact member names |
-| Step 5 | Installer GUI completed | User confirmation and setup path |
+| Step 5 | Installer GUI completed and CrossOver registration verified | User confirmation, setup path, and `verify-registration --repair` PASS |
 | Step 6 | Setup patch verified | patch-setup output and byte/hash evidence |
 | Step 7 | Gecko and game configuration checked | check-gecko, configure, and optional keyboard output |
 | Step 8 | Stock runtime probe completed | AFFECTED and clobbered *entry count* from probe output |
 | Step 9 | Runtime branch selected | Option A (default), Option B overlay, or clean stock |
 | Step 10 | DLL deployed | Option A: CrossOver.app wow64win.dll hash; Option B: overlay after-probe |
-| Step 11 | OpenSetup + launch | Gravity registry present; official wine launched Patcher |
+| Step 11 | CrossOver registration + launchers + Settings SOP | Registration PASS; both user-level launchers signed; Settings instructions shown to the user |
 | Step 12 | Live runtime verified | uaRO.exe alive ≥15s; lsof wow64win.dll path/hash; verify-live-runtime status=pass |
 
 Status values:
@@ -146,7 +157,7 @@ Status values:
 - BLOCKED: a safety gate, missing input, failed verification, or unsupported state prevents continuation.
 - N/A: the checkpoint does not apply, such as overlay build when the stock baseline is clean.
 
-Do not report the whole installation as complete while Step 5, Step 8, or Step 12 is unconfirmed.
+Do not report the whole installation as complete while Step 5, Step 8, Step 11 registration/launcher checks, or Step 12 is unconfirmed.
 
 ## 4. Parameters and evidence
 
@@ -356,6 +367,18 @@ scripts/uaro-crossover.zsh bottle status --bottle "$BOTTLE_NAME"
 
 Record GAME_DIR and verify that both setup.exe and the expected uaRO files exist before Phase C.
 
+Before continuing, verify that CrossOver can recognize the installed application without opening its desktop UI. The command performs a read-only check first and, when needed, runs one non-destructive `cxbottle --install` export before checking again:
+
+~~~zsh
+scripts/uaro-crossover.zsh verify-registration \
+  --bottle "$BOTTLE_NAME" \
+  --game-dir "$GAME_DIR" \
+  --applications-dir "$HOME/Applications" \
+  --repair --json
+~~~
+
+This is a hard gate. A missing `cxmenu.conf` entry, missing CrossOver menu plist, stale bottle/build path, missing Windows shortcut, or missing exported command is `BLOCKED`; do not call the installation complete or proceed by guessing a different bottle. The repair only updates CrossOver menu/association exports and records a log under the uaRO state log directory.
+
 ## 8. Phase C — setup patch and game configuration
 
 ### Step 6 — Patch and verify setup.exe
@@ -409,21 +432,19 @@ scripts/uaro-crossover.zsh configure-keyboard --bottle "$BOTTLE_NAME"
 
 Re-run the relevant verification after each change.
 
-Lua config is not enough for a first launch. If `user.reg` has no `[Software\\Gravity\\RagnarokOnline]` key, the client starts OpenSetup (`setup.exe`) instead of the game. After Step 6, launch Settings through official wine:
+Lua config is not enough for a first launch. The skill does not inspect or guess whether the user's Settings choices are correct. After Step 6, launch Settings through the supported user-level launcher or official wine:
 
 ~~~zsh
 scripts/uaro-crossover.zsh launch-setup --bottle "$BOTTLE_NAME" --game-dir "$GAME_DIR"
 ~~~
 
-**Stop and tell the user what to set in Settings / OpenSetup before OK.** OpenSetup defaults are wrong for this Mac skill. The player must:
+**Show this short SOP to the user before they click OK.** OpenSetup defaults are wrong for this Mac skill. The player must:
 
 1. **Resolution:** `2560 x 1600` (or the size they asked for).
 2. **Graphics API:** **DirectX 9** (not DirectX 8 / OpenGL).
 3. **Restrict mouse to window:** **unchecked**. The box is ticked by default — clear it.
 
-Then click **OK**. Same three items if they later open `UaRO CrossOver Settings.app`. Do not open Settings and Patcher at the same time.
-
-Resume only after the Gravity registry key exists. Do not treat Patcher Play as the first-run OpenSetup substitute.
+Then click **OK** and close Settings. The skill records that the instructions were shown; it does not read `user.reg` or fail the installation because a setting cannot be inspected without desktop control. Do not open Settings and Patcher at the same time.
 
 ## 9. Phase D — raw-input probe and runtime choice
 
@@ -494,13 +515,23 @@ A failed after-probe blocks launch.
 
 ### Step 11 — Launch Patcher through official CrossOver wine
 
-Do not use `/Applications/uaRO/` Whisky experiment bundles. Optional generated apps:
+Do not use `/Applications/uaRO/` Whisky experiment bundles. Build the supported user-level launchers as part of the completion path:
 
 ~~~zsh
 scripts/uaro-crossover.zsh build-launchers --bottle "$BOTTLE_NAME" --game-dir "$GAME_DIR"
 ~~~
 
-`build-launchers` embeds `references/icons/AppIcon.icns` and signs the bundle. Confirmed working: official CrossOver wine after Option A, wait while Patcher/uaRO run, then codesign. Do not `exec` Wine as the `.app` (Dock bounce). Do not start Wine and `exit 0` (flash quit). Do not add icons by editing Resources on a signed app. `repair` only audits launcher scripts/signatures; it does not prove the game starts.
+By default the bundles are created under `$HOME/Applications`, avoiding an administrator prompt. They are on-demand launchers, not resident apps: they use CrossOver `--wait-children`, exit when Settings/Patcher and their children exit, and set `LSUIElement` so macOS does not present them as ordinary Dock applications. Pass `--applications-dir /Applications` only when the user explicitly wants system-wide apps. `build-launchers` embeds `references/icons/AppIcon.icns` and signs both bundles. Do not add LaunchAgents, login items, daemons, or a polling loop. `repair` audits registration, launcher scripts, signatures, and on-demand lifecycle metadata; it does not prove the game starts.
+
+Re-run the registration check after building launchers:
+
+~~~zsh
+scripts/uaro-crossover.zsh verify-registration \
+  --bottle "$BOTTLE_NAME" \
+  --game-dir "$GAME_DIR" \
+  --applications-dir "$HOME/Applications" \
+  --json
+~~~
 
 Supported launch after Option A:
 
@@ -613,6 +644,7 @@ For a user who asks whether an existing installation is working, do not reinstal
 
 ~~~zsh
 scripts/uaro-crossover.zsh bottle status --bottle "$BOTTLE_NAME"
+scripts/uaro-crossover.zsh verify-registration --bottle "$BOTTLE_NAME" --applications-dir "$HOME/Applications" --json
 scripts/uaro-crossover.zsh verify-live-runtime --bottle "$BOTTLE_NAME" --game-dir "$GAME_DIR" --json
 ~~~
 
@@ -666,20 +698,30 @@ The command must not touch other bottles, the CrossOver app, user credentials, o
 
 ## 13. Completion report
 
+Start the user-facing report with this plain-language block before technical evidence:
+
+~~~text
+现在能不能玩：PASS / 未完成 / 被阻断
+CrossOver 是否能识别 uaRO：PASS / 未确认 / BLOCKED
+Patcher/Settings 是否可用：PASS / 未生成 / 失败
+~~~
+
+Then show only three next-step categories: what the user can do now, what the user must do, and which automatic evidence could not be proven. Keep paths, hashes, plist details, and state fields in the technical appendix.
+
 Report the result in this order:
 
 1. Route used: CrossOver fresh install, existing state, repair, verify, or uninstall.
 2. Actual CrossOver app/build, CLI, bottle, game directory, and runtime branch.
 3. Progress table with PASS, N/A, UNCONFIRMED, and BLOCKED states.
 4. Artifact identity and installer evidence.
-5. Setup patch sites and configuration values (default OpenSetup: 2560×1600, DirectX 9, Restrict mouse to window off).
+5. Setup patch sites and the Settings SOP shown to the user (default: 2560×1600, DirectX 9, Restrict mouse to window off); do not claim the user's selections were machine-verified.
 6. Stock probe values: AFFECTED and clobbered entry count.
 7. Option A app DLL hash, or overlay manifest/after-probe, or why deploy was N/A.
-8. Launch command; no Game.app; Gravity registry present.
+8. Launch command; no Game.app; Settings instructions shown.
 9. Live verification: process age, lsof path, verify-live-runtime status.
 10. Evidence labels: 已确认, 根据证据推导, 未确认, 来源冲突, or 被阻断.
 
-A complete installation requires Step 5 and Step 12 to be PASS. Option A may mark overlay Step 10 details as N/A when `deploy-app` hash matches. A clean stock result may mark Step 10 as N/A only when AFFECTED=no and clobbered entries = 0.
+A complete installation requires Step 5, Step 11 registration/launcher checks, and Step 12 to be PASS. Option A may mark overlay Step 10 details as N/A when `deploy-app` hash matches. A clean stock result may mark Step 10 as N/A only when AFFECTED=no and clobbered entries = 0. A visual CrossOver screenshot is not required; registration PASS is based on CLI, plist, shortcut, path, and build evidence.
 
 ## References
 

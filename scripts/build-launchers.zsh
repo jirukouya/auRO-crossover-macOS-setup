@@ -7,7 +7,7 @@ source "$SCRIPT_DIR/lib/crossover-common.zsh"
 BOTTLE_NAME="uaro-crossover"
 GAME_DIR=""
 OVERLAY_DIR=""
-APPLICATIONS_DIR="/Applications"
+APPLICATIONS_DIR="$HOME/Applications"
 REPLACE=0
 OVERLAY_REQUESTED=0
 
@@ -168,23 +168,10 @@ with os.fdopen(fd, "w", encoding="utf-8") as handle:
 os.replace(tmp, path)
 STATEPY
 print -- "PID=$CHILD_PID; verify with: uaro-crossover.zsh verify-live-runtime --bottle $BOTTLE_NAME --json"
-# CrossOver's bin/wine often returns immediately. Exiting then looks like a
-# flash-quit and can SIGHUP Patcher. Detach Wine, then stay alive while
-# Patcher.exe or uaRO.exe is running so this .app does not flash-quit.
-"$WINE_CMD" --bottle "$BOTTLE_NAME" --workdir "$GAME_DIR" --cx-app "$APP_WIN" >>"$LAUNCH_LOG" 2>&1 &!
-seen=0
-for ((i=0; i<180; i++)); do
-  if pgrep -f 'UaRo Patcher.exe' >/dev/null 2>&1 || pgrep -f '[\\]uaRO.exe' >/dev/null 2>&1; then
-    seen=1
-    sleep 2
-    continue
-  fi
-  if (( seen )); then
-    break
-  fi
-  sleep 1
-done
-exit 0
+# Keep this launcher alive only for the lifetime of the requested Windows app.
+# CrossOver's wait-children mode handles both setup.exe and Patcher/uaRO child
+# processes; there is no detached Wine process, polling loop, or daemon.
+exec "$WINE_CMD" --bottle "$BOTTLE_NAME" --workdir "$GAME_DIR" --wait-children --cx-app "$APP_WIN" >>"$LAUNCH_LOG" 2>&1
 '''
 for token, value in {
     "__GAME_DIR__": game_dir,
@@ -208,6 +195,7 @@ plist = {
     "CFBundleShortVersionString": "0.2.3",
     "CFBundleVersion": "0.2.3",
     "LSMinimumSystemVersion": "13.0",
+    "LSUIElement": True,
     "NSHighResolutionCapable": True,
 }
 icon_src = Path(icon_file)
@@ -234,5 +222,28 @@ create_launcher "UaRO CrossOver Settings" "com.jirukouya.uaro.crossover.settings
 GAME_DIR="$GAME_DIR"
 uo_write_state launchers built
 uo_info "INFO: launcher runtime=$RUNTIME_MODE"
+LAUNCHER_STATE_JSON="$(python3 - "$APPLICATIONS_DIR" "$BOTTLE_NAME" "$GAME_DIR" "$RUNTIME_MODE" <<'PY'
+import json
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+applications_dir, bottle, game_dir, runtime = sys.argv[1:]
+root = Path(applications_dir)
+print(json.dumps({
+    "launchers": {
+        "status": "pass",
+        "applications_dir": str(root),
+        "patcher_path": str(root / "UaRO CrossOver Patcher.app"),
+        "settings_path": str(root / "UaRO CrossOver Settings.app"),
+        "bottle": bottle,
+        "game_dir": game_dir,
+        "runtime": runtime,
+        "verified_at": datetime.now(timezone.utc).isoformat(),
+    }
+}))
+PY
+)"
+uo_state_merge_json "$LAUNCHER_STATE_JSON"
 uo_info "PASS: created the two supported launchers under $APPLICATIONS_DIR"
 uo_info "INFO: no direct game launcher was created"

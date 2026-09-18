@@ -19,7 +19,8 @@ for script in "$ROOT"/scripts/*.zsh "$ROOT"/scripts/lib/*.zsh \
   "$ROOT"/scripts/check-gecko "$ROOT"/scripts/verify-installer "$ROOT"/scripts/artifact \
   "$ROOT"/scripts/build-rawinput-artifact.zsh "$ROOT"/scripts/configure-keyboard.zsh \
   "$ROOT"/scripts/verify-live-runtime.zsh "$ROOT"/scripts/diagnose.zsh \
-  "$ROOT"/scripts/deploy-app.zsh "$ROOT"/scripts/launch-patcher.zsh; do
+  "$ROOT"/scripts/deploy-app.zsh "$ROOT"/scripts/launch-patcher.zsh \
+  "$ROOT"/scripts/verify-registration.zsh; do
   zsh -n "$script"
 done
 
@@ -30,6 +31,11 @@ fi
 
 if has_text '/Users/jax|/Users/[A-Za-z0-9._-]+/Downloads/gepard' "$ROOT/scripts"; then
   print -u2 -- "ERROR: scripts contain another computer's absolute path"
+  exit 1
+fi
+
+if has_text 'osascript|System Events|cua_repl|computer\.click' "$ROOT/scripts/verify-registration.zsh" "$ROOT/scripts/verify-registration.py"; then
+  print -u2 -- "ERROR: registration verification must not depend on desktop control"
   exit 1
 fi
 
@@ -71,12 +77,27 @@ if ! has_text 'runtime_mode' "$ROOT/scripts/build-launchers.zsh"; then
   exit 1
 fi
 
+if ! has_text 'wait-children|LSUIElement' "$ROOT/scripts/build-launchers.zsh"; then
+  print -u2 -- "ERROR: launchers must be on-demand and hidden from ordinary Dock app treatment"
+  exit 1
+fi
+
+if has_text '&!|for \(\(i=0; i<180' "$ROOT/scripts/build-launchers.zsh"; then
+  print -u2 -- "ERROR: launchers must not detach Wine or poll as a resident background process"
+  exit 1
+fi
+
 for marker in 'Fresh-session execution contract' 'CX_BUILD' 'Verify-only existing installation' 'repair --bottle' 'Patcher.*client' 'allow-missing-installer' 'deploy-app'; do
   if ! has_text "$marker" "$ROOT/SKILL.md"; then
     print -u2 -- "ERROR: Skill execution contract marker is missing: $marker"
     exit 1
   fi
 done
+
+if ! has_text 'verify-registration|registration' "$ROOT/scripts/uaro-crossover.zsh" "$ROOT/SKILL.md"; then
+  print -u2 -- "ERROR: CrossOver registration gate is missing"
+  exit 1
+fi
 
 if has_text 'Game\.app' "$ROOT/scripts/build-launchers.zsh"; then
   print -u2 -- "ERROR: the first launcher release must not generate Game.app"
