@@ -59,9 +59,11 @@ with tempfile.TemporaryDirectory() as temporary:
     assert report["profile"] == "fixture-profile"
     assert report["would_patch"] == ["site_a", "site_b", "site_c"]
 
-    run("--setup", str(setup), "--profiles-file", str(profile_path))
+    first = run("--setup", str(setup), "--profiles-file", str(profile_path))
     assert setup.read_bytes() == bytes(patched)
     assert setup.with_name("setup.exe.fixture.backup").read_bytes() == bytes(original)
+    report = json.loads(first.stdout)
+    assert report["states"] == {"site_a": "patched", "site_b": "patched", "site_c": "patched"}
 
     state_path = root / "state.json"
     state_path.write_text(json.dumps({"schema": 2, "setup": {"backup": "keep-this-backup"}}), encoding="utf-8")

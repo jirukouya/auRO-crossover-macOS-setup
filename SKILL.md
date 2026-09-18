@@ -459,7 +459,7 @@ The candidate DLL is not automatically deployed. It is only eligible when the st
 
 If the baseline is clean, keep the recorded stock probe as the evidence that no overlay is required. The current overlay verify command is for an existing overlay, so do not invoke it on the clean branch. Step 10 is N/A.
 
-If the baseline is affected, continue to Step 10. Default deployment is Option A into CrossOver.app. Option B overlay is only if the user refuses to change the app bundle.
+If the baseline is affected, continue to Step 10. Default deployment is Option A into CrossOver.app, but it requires explicit `--confirm-app-change` because it changes the shared CrossOver.app runtime. Option B overlay is only if the user refuses to change the app bundle.
 
 ## 10. Phase E — DLL deploy, launch, and live verification
 
@@ -470,17 +470,17 @@ Wine loads builtin `wow64win.dll` from the directory of the `ntdll.so` that was 
 **Option A (default, gepard-crossover-fix SHARE-PROMPT):** backup then replace the DLL inside CrossOver.app:
 
 ~~~zsh
-scripts/uaro-crossover.zsh deploy-app --artifact-dir "$ARTIFACT_DIR" --bottle "$BOTTLE_NAME"
+scripts/uaro-crossover.zsh deploy-app --artifact-dir "$ARTIFACT_DIR" --bottle "$BOTTLE_NAME" --confirm-app-change
 ~~~
 
-Keep `wow64win.dll.orig`. CrossOver updates restore stock; re-run `deploy-app`. Confirm with the official wrapper, not an overlay wine:
+Keep `wow64win.dll.orig`. CrossOver updates restore stock; after reviewing the shared-app impact, re-run `deploy-app --confirm-app-change`. Confirm with the official wrapper, not an overlay wine:
 
 ~~~zsh
-# copy probe into the bottle first if needed
-scripts/uaro-crossover.zsh overlay probe --bottle "$BOTTLE_NAME" --artifact-dir "$ARTIFACT_DIR"
+# copy probe into the bottle first if needed; use the after scope after Option A
+scripts/uaro-crossover.zsh overlay probe --bottle "$BOTTLE_NAME" --artifact-dir "$ARTIFACT_DIR" --probe-scope after
 ~~~
 
-After Option A, a probe through `$CX_WINE --bottle --cx-app` must print AFFECTED=no and clobbered entries = 0.
+After Option A, a probe through `$CX_WINE --bottle --cx-app` must print AFFECTED=no and clobbered entries = 0. Use `overlay probe --probe-scope after` so the state file does not overwrite the stock before-probe result.
 
 **Option B (only if the user refuses to edit CrossOver.app):** build the per-bottle overlay, then set `BinPath`/`LibPath` in `cxbottle.conf` as in the gepard-crossover-fix SKILL. Building overlay files without those bottle keys is not Option B.
 

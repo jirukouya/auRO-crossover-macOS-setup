@@ -51,6 +51,21 @@ for marker in RUNTIME_MODE STOCK_BASELINE_CLEAN overlay_probe_before_clobbered; 
   fi
 done
 
+if ! has_text 'confirm-app-change' "$ROOT/scripts/deploy-app.zsh" "$ROOT/SKILL.md" "$ROOT/README.md"; then
+  print -u2 -- "ERROR: Option A app-level confirmation gate is missing"
+  exit 1
+fi
+
+if ! has_text 'probe-scope|probe-after-pass|overlay_probe_after' "$ROOT/scripts/overlay.zsh" "$ROOT/SKILL.md"; then
+  print -u2 -- "ERROR: before/after probe state separation is missing"
+  exit 1
+fi
+
+if ! has_text 'parse-vmmap-paths|lsof -p.*-Fn' "$ROOT/scripts/verify-live-runtime.zsh"; then
+  print -u2 -- "ERROR: vmmap path parsing safeguards are missing"
+  exit 1
+fi
+
 if ! has_text 'runtime_mode' "$ROOT/scripts/build-launchers.zsh"; then
   print -u2 -- "ERROR: launcher runtime state propagation is missing"
   exit 1

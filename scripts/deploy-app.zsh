@@ -6,22 +6,26 @@ source "$SCRIPT_DIR/lib/crossover-common.zsh"
 
 BOTTLE_NAME="uaro-crossover"
 ARTIFACT_DIR=""
+CONFIRM_APP_CHANGE=0
 
 usage() {
-  print "Usage: deploy-app.zsh --artifact-dir DIR [--bottle NAME]"
+  print "Usage: deploy-app.zsh --artifact-dir DIR --confirm-app-change [--bottle NAME]"
   print "Option A: backup then replace CrossOver.app wow64win.dll from a verified artifact."
+  print "The confirmation is required because this changes the shared CrossOver.app runtime."
 }
 
 while (( $# )); do
   case "$1" in
     --bottle) BOTTLE_NAME="$2"; shift 2 ;;
     --artifact-dir) ARTIFACT_DIR="$2"; shift 2 ;;
+    --confirm-app-change) CONFIRM_APP_CHANGE=1; shift ;;
     -h|--help) usage; exit 0 ;;
     *) usage >&2; exit 2 ;;
   esac
 done
 
 [[ -n "$ARTIFACT_DIR" ]] || uo_die "--artifact-dir is required"
+(( CONFIRM_APP_CHANGE )) || uo_die "Option A changes the shared CrossOver.app runtime; pass --confirm-app-change after reviewing the impact"
 ARTIFACT_DIR="$(uo_realpath "$ARTIFACT_DIR")" || uo_die "artifact directory does not exist: $ARTIFACT_DIR"
 
 uo_validate_bottle_name "$BOTTLE_NAME"
@@ -62,4 +66,4 @@ uo_state_set app_dll_orig_sha256 "$ORIG_HASH"
 uo_state_set app_dll_path "$TARGET"
 uo_write_state deploy-app pass
 uo_info "PASS: Option A app DLL sha256=$SRC_HASH"
-uo_info "INFO: CrossOver updates can restore the stock DLL; re-run deploy-app after an update"
+uo_info "INFO: CrossOver updates can restore the stock DLL; after reviewing the shared-app impact, re-run deploy-app --confirm-app-change after an update"

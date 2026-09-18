@@ -59,6 +59,8 @@ import json, sys
 print(json.dumps({"launch": {"runtime_check": json.loads(sys.argv[1])}}))
 PY
 )"
+  uo_state_set live_runtime_status unconfirmed
+  uo_write_state runtime unconfirmed
   (( JSON )) && print -- "$result" || uo_info "INFO: uaRO is not currently running; runtime route is unconfirmed"
   exit 0
 fi
@@ -73,17 +75,7 @@ fi
 typeset -a mapped=()
 while IFS= read -r line; do
   [[ -n "$line" ]] && mapped+=("$line")
-done < <(python3 - "$vmmap_output" <<'PY'
-import re
-import sys
-from pathlib import Path
-
-for line in Path(sys.argv[1]).read_text(encoding="utf-8", errors="replace").splitlines():
-    match = re.search(r"(/.*(?:wow64win\.dll|ntdll\.so))\s*$", line, re.IGNORECASE)
-    if match:
-        print(match.group(1))
-PY
-)
+done < <(python3 "$SCRIPT_DIR/parse-vmmap-paths.py" "$vmmap_output" "$CX_ROOT" "$OVERLAY_DIR")
 
 launch_path="unknown"
 runtime="unknown"
@@ -109,10 +101,10 @@ fi
 wow64_path="$(printf '%s\n' "${mapped[@]}" | grep -i 'wow64win\.dll' | head -1 || true)"
 ntdll_path="$(printf '%s\n' "${mapped[@]}" | grep -i 'ntdll\.so' | head -1 || true)"
 if [[ -z "$wow64_path" ]]; then
-  wow64_path="$(lsof -p "$PID" 2>/dev/null | awk 'tolower($0) ~ /wow64win\.dll/ {print $NF; exit}' || true)"
+  wow64_path="$(lsof -p "$PID" -Fn 2>/dev/null | awk 'tolower($0) ~ /^n.*wow64win\.dll$/ {sub(/^n/, ""); print; exit}' || true)"
 fi
 if [[ -z "$ntdll_path" ]]; then
-  ntdll_path="$(lsof -p "$PID" 2>/dev/null | awk 'tolower($0) ~ /ntdll\.so/ {print $NF; exit}' || true)"
+  ntdll_path="$(lsof -p "$PID" -Fn 2>/dev/null | awk 'tolower($0) ~ /^n.*ntdll\.so$/ {sub(/^n/, ""); print; exit}' || true)"
 fi
 wow64_hash=""
 ntdll_hash=""
@@ -179,6 +171,12 @@ import json, sys
 print(json.dumps({"launch": {"runtime_check": json.loads(sys.argv[1])}}))
 PY
 )"
+uo_state_set live_runtime_status "$runtime_status"
+if [[ "$runtime_status" == "pass" ]]; then
+  uo_write_state runtime verified
+else
+  uo_write_state runtime "$runtime_status"
+fi
 
 if (( JSON )); then
   print -- "$RESULT_JSON"

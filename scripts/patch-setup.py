@@ -206,7 +206,7 @@ def main() -> int:
         "backup": str(backup),
         "before_sha256": current_hash,
         "after_sha256": final_hash,
-        "states": states,
+        "states": {site["name"]: "patched" for site in pending},
         "patched": [site["name"] for site in pending],
         "changed_offsets": [hex(value) for value in sorted(changed_offsets)],
         "status": "patched",

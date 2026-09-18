@@ -53,7 +53,7 @@ CrossOver's desktop app already bundles the interfaces used by this workflow, in
 
 The AI will search Downloads/Documents/Games. If it cannot find those two packages, it will ask you for the paths once.
 
-The raw-input fix **backs up then replaces** `wow64win.dll` inside CrossOver.app. A CrossOver update can undo that; ask the AI to re-run `deploy-app`.
+The raw-input fix **backs up then replaces** `wow64win.dll` inside CrossOver.app. This is a shared application-level change and therefore requires `--confirm-app-change`; review the impact before running it. A CrossOver update can undo that; ask the AI to re-run `deploy-app --confirm-app-change`.
 
 ## How to actually run this
 

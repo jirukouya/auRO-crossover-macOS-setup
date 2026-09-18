@@ -19,7 +19,7 @@ Valid branches after the stock probe:
 | Baseline | Deploy | Live success |
 |---|---|---|
 | AFFECTED=no, clobbered entries = 0 | None | `runtime=stock` `status=pass` |
-| AFFECTED=yes, clobbered entries > 0 | **Option A** `deploy-app` (default) | `uaRO.exe` ≥15s; lsof = CrossOver.app DLL; hash = artifact |
+| AFFECTED=yes, clobbered entries > 0 | **Option A** `deploy-app --confirm-app-change` (default) | `uaRO.exe` ≥15s; lsof = CrossOver.app DLL; hash = artifact |
 | Same affected baseline | Option B overlay **and** `cxbottle.conf` BinPath/LibPath | `runtime=overlay` `status=pass` |
 
 Clobbered **entry count** 238 is the expected broken thunk on this Mac. It is not the contamination flag `CLOBBERED=1`.

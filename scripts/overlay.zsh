@@ -11,9 +11,10 @@ fi
 BOTTLE_NAME="uaro-crossover"
 ARTIFACT_DIR=""
 OVERLAY_DIR=""
+PROBE_SCOPE="before"
 
 usage() {
-  print "Usage: overlay.zsh {probe|build|verify} --bottle NAME --artifact-dir DIR [--overlay-dir DIR]"
+  print "Usage: overlay.zsh {probe|build|verify} --bottle NAME --artifact-dir DIR [--overlay-dir DIR] [--probe-scope before|after]"
 }
 
 while (( $# )); do
@@ -21,6 +22,7 @@ while (( $# )); do
     --bottle) BOTTLE_NAME="$2"; shift 2 ;;
     --artifact-dir) ARTIFACT_DIR="$2"; shift 2 ;;
     --overlay-dir) OVERLAY_DIR="$2"; shift 2 ;;
+    --probe-scope) PROBE_SCOPE="$2"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) usage >&2; exit 2 ;;
   esac
@@ -28,6 +30,7 @@ done
 
 [[ -n "$ACTION" ]] || { usage >&2; exit 2; }
 [[ -n "$ARTIFACT_DIR" ]] || uo_die "--artifact-dir is required"
+[[ "$PROBE_SCOPE" == "before" || "$PROBE_SCOPE" == "after" ]] || uo_die "--probe-scope must be before or after"
 ARTIFACT_DIR="$(uo_realpath "$ARTIFACT_DIR")" || uo_die "artifact directory does not exist: $ARTIFACT_DIR"
 
 uo_validate_bottle_name "$BOTTLE_NAME"
@@ -144,13 +147,23 @@ run_probe() {
 case "$ACTION" in
   probe)
     "${VERIFY_PROBE_ARTIFACT[@]}"
-    run_probe "$CX_WINE" before 0
-    record_probe_state stock affected
-    uo_state_set overlay_probe_before pass
-    uo_state_set overlay_probe_before_log "$PROBE_LOG"
-    uo_state_set overlay_probe_before_affected "$PROBE_AFFECTED"
-    uo_state_set overlay_probe_before_clobbered "$PROBE_CLOBBERED"
-    uo_write_state overlay probe-before-pass
+    if [[ "$PROBE_SCOPE" == "before" ]]; then
+      run_probe "$CX_WINE" before 0
+      record_probe_state stock affected
+      uo_state_set overlay_probe_before pass
+      uo_state_set overlay_probe_before_log "$PROBE_LOG"
+      uo_state_set overlay_probe_before_affected "$PROBE_AFFECTED"
+      uo_state_set overlay_probe_before_clobbered "$PROBE_CLOBBERED"
+      uo_write_state overlay probe-before-pass
+    else
+      run_probe "$CX_WINE" after 1
+      record_probe_state after clean
+      uo_state_set overlay_probe_after pass
+      uo_state_set overlay_probe_after_log "$PROBE_LOG"
+      uo_state_set overlay_probe_after_affected "$PROBE_AFFECTED"
+      uo_state_set overlay_probe_after_clobbered "$PROBE_CLOBBERED"
+      uo_write_state runtime probe-after-pass
+    fi
     ;;
   build)
     "${VERIFY_OVERLAY_ARTIFACT[@]}"

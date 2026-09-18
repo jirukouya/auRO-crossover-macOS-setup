@@ -6,7 +6,7 @@ Inspect the installed `setup.exe`, not `UaRO_Setup.exe`. Confirm its full SHA-25
 
 ## `Gepard::T Code: 3::110::12` after map load
 
-Inspect live `uaRO.exe` with `lsof` for `wow64win.dll`. After Option A, the path must be inside CrossOver.app and the hash must match `deploy-app`. If lsof still shows the stock `.orig` file, re-run `deploy-app`. Overlay probe PASS with no live process is not a fix. If the baseline was never affected, a remaining T-code is not proof that a DLL overlay is needed. Do not patch Gepard itself.
+Inspect live `uaRO.exe` with `lsof` for `wow64win.dll`. After Option A, the path must be inside CrossOver.app and the hash must match `deploy-app`. If lsof still shows the stock `.orig` file, review the shared-app impact and re-run `deploy-app --confirm-app-change`. Overlay probe PASS with no live process is not a fix. If the baseline was never affected, a remaining T-code is not proof that a DLL overlay is needed. Do not patch Gepard itself.
 
 ## Game never starts / Dock “Running in Background”
 
