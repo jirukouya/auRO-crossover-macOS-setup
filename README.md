@@ -6,11 +6,11 @@
 
 This repository is intentionally separate from the [Whisky workflow](https://github.com/jirukouya/auRO-whisky-macOS-setup). CrossOver bottles, Wine runtime paths, launchers, and overlays use different interfaces and must not be mixed with Whisky commands.
 
-## AzzyAI is now supported
+## AzzyAI is a separate optional add-on
 
-The CrossOver installation skill now includes optional support for **AzzyAI**, a third-party AI that lets your **mercenary** or **homunculus** automatically find and attack nearby monsters.
+The repository includes a separate procedure for **AzzyAI**, a third-party AI that lets your **mercenary** or **homunculus** automatically find and attack nearby monsters. It is not part of the core uaRO installation.
 
-After a fresh uaRO installation passes the normal live-runtime check, the skill asks whether you also want to install AzzyAI. The normal uaRO installation remains unchanged if you choose **No**.
+The core installation never asks about AzzyAI and is complete without it. Request the add-on separately only after uaRO passes the normal live-runtime check.
 
 ## The problem this solves
 
@@ -120,6 +120,20 @@ Already installed uaRO through CrossOver? Hand the AI this repository and ask:
 ```text
 Read SKILL.md in this repository. I already have uaRO installed in CrossOver. Inspect the current bottle, setup.exe profile, Gecko, raw-input artifact, overlay, and launcher route. Apply only missing or outdated fixes, and do not reinstall the game unless verification proves it is necessary.
 ```
+
+If an earlier installation stopped halfway, tell the AI:
+
+```text
+继续安装 uaRO。先读取 state，判断上次停在哪一步，不要重新安装已经通过的部分。
+```
+
+The read-only planner behind this route is:
+
+```zsh
+scripts/uaro-crossover.zsh continue --bottle uaro-crossover --json
+```
+
+It returns the next core uaRO checkpoint. It never installs, patches, launches, or deletes anything by itself, and it never starts the separate AzzyAI add-on.
 
 If the symptom is `Gepard::T Code: 3::110::12`, diagnose the live route first:
 

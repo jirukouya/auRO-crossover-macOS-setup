@@ -31,7 +31,9 @@ Do these in order. Do **not** first read every file under `references/`.
    - Option A will backup then replace `wow64win.dll` **inside CrossOver.app**
 3. Search this Mac for the installer and gepard folder (`~/Downloads`, `~/Documents`, `~/Games`, Desktop). If found, use those paths. If not, ask **once** for both paths. Do not invent downloads.
 4. Defaults unless a matching bottle already exists: `BOTTLE_NAME=uaro-crossover`, `ARTIFACT_DIR=$HOME/Games/UaRO-CrossOver-artifacts`. Do not stall on renaming them.
-5. Run host preflight from the repo root, then the internal Steps 1–12. Keep the technical progress table internally; for a beginner, show only the four-stage summary below. Stop only for: missing files, installer/OpenSetup GUI, macOS permission, login, or the user refusing Option A.
+5. If the user says “继续安装” or this is an existing/partial install, run the read-only resume planner first:
+   `scripts/uaro-crossover.zsh continue --bottle uaro-crossover --json`
+   Use its `next_step` as a routing hint, then re-run the owning command and its verification. It never installs, patches, launches, or deletes anything by itself. For a fresh install, run host preflight from the repo root, then the internal Steps 1–12. Keep the technical progress table internally; for a beginner, show only the four-stage summary below. Stop only for: missing files, installer/OpenSetup GUI, macOS permission, login, or the user refusing Option A.
 6. If the user only pasted this SKILL.md without the repo, clone the repo first. The skill cannot run from this file alone.
 
 ## Beginner-facing flow
@@ -119,6 +121,14 @@ Route-specific first action:
 | Verify-only | Run `verify-live-runtime`; add `diagnose --error` when the user supplied an exact symptom. | Report `PASS`, `UNCONFIRMED`, or `BLOCKED`; do not mutate state except the normal verification record. |
 | Repair | Run diagnostic `repair` without `--fix`. | Use `--fix` only after confirming that the requested repair is limited to generated launchers. |
 | Uninstall | Resolve the exact game directory or bottle and show the final target path. | Require explicit scope and `--confirm` immediately before moving/deleting. |
+
+When the user says “继续安装”, do not restart the whole explanation. Read the state and run the planner:
+
+~~~zsh
+scripts/uaro-crossover.zsh continue --bottle uaro-crossover --json
+~~~
+
+The planner is read-only and only selects the next core uaRO checkpoint (`preflight`, `install`, `patch-setup`, `check-gecko`, `overlay-probe`, runtime choice, launcher creation, or live launch). It re-checks the recorded bottle/game paths and never treats an old `pass` entry as proof. If no state exists, it returns `preflight`. If core installation is complete, it returns `next_step=none`. AzzyAI is never selected by this planner; it remains a separate, explicit post-install request.
 
 ## 2. Operating principles
 
@@ -572,16 +582,15 @@ scripts/uaro-crossover.zsh diagnose --bottle "$BOTTLE_NAME" --error "$ERROR_TEXT
 
 Never report fixed based only on launcher files or a generated manifest. The live runtime check is the completion gate.
 
-## Optional: AzzyAI (mercenary/homunculus auto-attack)
+## Optional post-install add-on: AzzyAI (mercenary/homunculus auto-attack)
 
-AzzyAI is an optional third-party Lua AI that can make a uaRO mercenary or homunculus automatically find and attack nearby monsters. It is separate from the CrossOver runtime fix and must not be installed unless the user opts in.
+AzzyAI is an optional third-party Lua AI that can make a uaRO mercenary or homunculus automatically find and attack nearby monsters. It is **not part of the core installation**, does not affect the core completion gate, and must not be installed unless the user starts a separate, explicit request after uaRO has passed the live-runtime check.
 
-After Step 12 passes, ask:
+Do not ask about AzzyAI during the normal install. After the core completion report is delivered, the user may start a separate request such as:
 
-> Would you like to install AzzyAI for your mercenary or homunculus? **Yes / No**
+> uaRO 已经可以玩了。现在另外帮我安装 AzzyAI。
 
-- **No** — leave AzzyAI uninstalled and finish the CrossOver installation report.
-- **Yes** — read and follow [`AZZYAI_FIXES.md`](./AZZYAI_FIXES.md) from Step 1 through the verification steps.
+The core installation report remains complete if the user never requests this add-on. If explicitly requested, read and follow [`AZZYAI_FIXES.md`](./AZZYAI_FIXES.md) from Step 1 through the verification steps.
 
 For the AzzyAI flow:
 

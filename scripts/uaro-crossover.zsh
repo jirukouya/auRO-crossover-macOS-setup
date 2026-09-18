@@ -4,7 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="${0:A:h}"
 
 usage() {
-  print "Usage: uaro-crossover.zsh <preflight|artifact|bottle|install|patch-setup|check-gecko|configure|configure-keyboard|deploy-app|overlay|build-launchers|verify-registration|launch-patcher|launch-setup|verify-live-runtime|diagnose|repair|uninstall> [options]"
+  print "Usage: uaro-crossover.zsh <preflight|continue|artifact|bottle|install|patch-setup|check-gecko|configure|configure-keyboard|deploy-app|overlay|build-launchers|verify-registration|launch-patcher|launch-setup|verify-live-runtime|diagnose|repair|uninstall> [options]"
   print ""
   print "CrossOver is the only supported runtime. Use --help on each command for details."
 }
@@ -17,6 +17,9 @@ fi
 case "$command" in
   preflight)
     exec "$SCRIPT_DIR/preflight.zsh" "$@"
+    ;;
+  continue)
+    exec python3 "$SCRIPT_DIR/continue.py" "$@"
     ;;
   artifact)
     exec "$SCRIPT_DIR/artifact" "$@"
