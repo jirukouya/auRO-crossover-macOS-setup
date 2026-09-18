@@ -1,33 +1,48 @@
 ---
 name: auro-crossover-macos-setup
-version: 0.2.2-experimental
+version: 0.2.3-experimental
 description: >-
   Install, repair, verify, or uninstall uaRO on Apple Silicon macOS using
-  CrossOver's bundled CLI and private bottles. Trigger when the user mentions
-  uaRO with CrossOver, CrossOver bottles or Wine, Gepard T Code 3::110::12 on
-  CrossOver, wow64win.dll, or a fully automated CrossOver setup, even if the
-  user does not explicitly say “use a Skill.” Do not use this skill for
-  Whisky-only installations. When this file is handed to a fresh AI session,
-  read it once, load the required repository references, route the task, and
-  execute the numbered steps in order.
-compatibility: Apple Silicon macOS; initial tested target CrossOver 26.3.0.39832; requires zsh, Python 3, CrossOver, the repository scripts/references, and a user-supplied uaRO installer.
+  CrossOver. Trigger when this GitHub repo or SKILL.md is handed to a fresh
+  AI session with “install uaRO”, “uaRO CrossOver”, Gepard T Code 3::110::12,
+  or wow64win.dll, even if the user does not say “use a Skill.” Read this file
+  once and start executing; do not wait for extra docs. Do not use this skill
+  for Whisky-only installs.
+compatibility: Apple Silicon macOS; CrossOver 26.3.0 line (public 26.3 / 26.3.0, build 26.3.0.*); requires zsh, Python 3, CrossOver, the repository scripts/references, and a user-supplied uaRO installer.
 ---
 
 # uaRO on macOS via CrossOver — Full Install Skill
 
-This skill is the executable runbook for installing, repairing, verifying, and uninstalling uaRO through CrossOver on Apple Silicon macOS.
+This file is meant to be handed to a fresh AI session (Claude Code, Codex, ChatGPT, Copilot, Grok) on a player's Mac, with no other context. Read it once, then execute. Commands live in `scripts/uaro-crossover.zsh`; do not invent hashes, bottle names, or installer downloads.
 
-It is a repository-level runbook, not a standalone installer. The commands below are the authoritative execution path; the repository scripts and references provide the implementation contract. Read the whole file once, load only the relevant supporting files listed in the Fresh-session contract, then follow the routing table and numbered steps. Do not invent paths, build numbers, hashes, bottle names, installer members, or artifact provenance.
+This is not a theory rewrite. It is the procedure after a real Apple Silicon + CrossOver 26.3.0 run: overlay-only probe can pass while Play still dies; OpenSetup must write Gravity registry; Option A into CrossOver.app is the deploy that actually started the game. The maintainer confirmation used build 26.3.0.39832; any 26.3.0.* is allowed if probes pass.
+
+## If this repo was just handed to you — start here
+
+Do these in order. Do **not** first read every file under `references/`.
+
+1. If the working directory is not this repository, clone it and `cd` into it:
+   `https://github.com/jirukouya/auRO-crossover-macOS-setup`
+2. Tell the user, in one short message, what this Mac must already have:
+   - Apple Silicon Mac
+   - CrossOver **26.3.0** (About CrossOver shows 26.3 or 26.3.0; build 26.3.0.*). Other major/minor versions stop.
+   - uaRO installer: `UaRO_Setup.exe` + `UaRO_Setup-1.bin` + `UaRO_Setup-2.bin` (zip or folder)
+   - `gepard-crossover-fix` folder from uaRO Discord (keep `wow64win.dll.crossover-26.3.0`; do not rename)
+   - Option A will backup then replace `wow64win.dll` **inside CrossOver.app**
+3. Search this Mac for the installer and gepard folder (`~/Downloads`, `~/Documents`, `~/Games`, Desktop). If found, use those paths. If not, ask **once** for both paths. Do not invent downloads.
+4. Defaults unless a matching bottle already exists: `BOTTLE_NAME=uaro-crossover`, `ARTIFACT_DIR=$HOME/Games/UaRO-CrossOver-artifacts`. Do not stall on renaming them.
+5. Run host preflight from the repo root, then Steps 1–12. Post the progress table after each step. Stop only for: missing files, installer/OpenSetup GUI, macOS permission, login, or the user refusing Option A.
+6. If the user only pasted this SKILL.md without the repo, clone the repo first. The skill cannot run from this file alone.
 
 ## 0. Fresh-session execution contract
 
-Before changing anything, do these actions in order:
+After the block above:
 
-1. Read `README.md`, `references/crossover-cli.md`, `references/state-schema.md`, and the reference matching the route: `runtime-routing.md` for runtime decisions, `raw-input-fix.md` for artifact/probe work, or `troubleshooting.md` for a symptom. Do not load every large reference by default.
-2. Run the relevant command with `--help` before using it. Some commands support `--json`; others intentionally do not. Do not add undocumented flags.
-3. Create a variable ledger. Every variable used in a later command must have a value, source, and status (`PASS`, `UNCONFIRMED`, or `BLOCKED`). Do not paste placeholder values into a command.
-4. Treat the default bottle name `uaro-crossover` as a proposal from the scripts, not as proof that it is the user's intended bottle.
-5. If the user supplied only this file and not the repository, installer, artifact, or local CrossOver state, stop and explain that the Skill cannot execute without those inputs.
+1. Open a reference only when blocked: `references/crossover-cli.md`, `raw-input-fix.md`, `runtime-routing.md`, `troubleshooting.md`, or `state-schema.md`. Do not load them all up front.
+2. Run the relevant command with `--help` before first use. Do not add undocumented flags.
+3. Keep a variable ledger from command output (`PASS` / `UNCONFIRMED` / `BLOCKED`). Do not paste placeholders.
+4. Re-derive paths from this machine. Never reuse `/Users/derekho` or another report.
+5. Missing installer or gepard package is a stop-and-ask, not a guess.
 
 For a JSON pre-flight result, use these exact keys to populate the ledger:
 
@@ -78,18 +93,17 @@ The state file is `STATE_FILE=$HOME/Library/Application Support/uaRO-CrossOver/s
 
 At the beginning of a new task:
 
-1. Identify whether the user wants CrossOver, Whisky, or both. If it is Whisky-only, stop this skill.
-2. State the current route: fresh install, existing state, repair, verify, or uninstall.
-3. Read the repository references required by that route and run the relevant script help output.
-4. Run Pre-flight before making any bottle, game, artifact, or launcher change.
-5. Re-derive every path from actual command output. Never reuse a path from memory or from an old report.
-6. Use the progress table below. After each phase, report what passed, what is unconfirmed, and the next action; stop and ask before continuing to the next phase. Always stop at a human GUI, credential, permission, destructive, or live-game gate.
+1. Identify CrossOver vs Whisky. Whisky-only → stop this skill.
+2. State the route: fresh install, existing, repair, verify, or uninstall.
+3. Follow **If this repo was just handed to you**. Then preflight. Do not start by reading all references.
+4. Re-derive every path from command output.
+5. Post the progress table after each step. Stop for GUI, credentials, permissions, missing files, or Option A refusal — not for every internal script.
 
 Route-specific first action:
 
 | Route | First action | Next decision |
 |---|---|---|
-| Fresh install | Confirm `BOTTLE_NAME`, record the installer/artifact inputs and `ARTIFACT_DIR`, then run Pre-flight with the installer input and raw-input source when available. | If the intended bottle does not exist, create it in Step 3; do not treat a missing status result as an installation failure. |
+| Fresh install | Search for installer + gepard package; use defaults `uaro-crossover` and `$HOME/Games/UaRO-CrossOver-artifacts`; run Pre-flight. | If the bottle does not exist, create it in Step 3. |
 | Existing/partial | Read state, run Pre-flight with `--allow-missing-installer` only when appropriate, then run bottle status. | Resume only after matching the state path to the current bottle and game files. |
 | Verify-only | Run `verify-live-runtime`; add `diagnose --error` when the user supplied an exact symptom. | Report `PASS`, `UNCONFIRMED`, or `BLOCKED`; do not mutate state except the normal verification record. |
 | Repair | Run diagnostic `repair` without `--fix`. | Use `--fix` only after confirming that the requested repair is limited to generated launchers. |
@@ -160,7 +174,7 @@ When a command prints a path, copy that exact path into the next command. Do not
 
 ## 5. Pre-flight and existing-state detection
 
-Run from the repository root. The command blocks below are templates: do not run a command until every variable on that line has a ledger value. Before the first command, confirm the proposed `BOTTLE_NAME` and choose `ARTIFACT_DIR`; for a fresh install, `uaro-crossover` and `$HOME/Games/UaRO-CrossOver-artifacts` are proposals only, not automatic selections. If the installer or artifact source is not known yet, begin with host-only discovery:
+Run from the repository root. Do not run a command until every variable on that line has a ledger value. For a public first run, use `BOTTLE_NAME=uaro-crossover` and `ARTIFACT_DIR=$HOME/Games/UaRO-CrossOver-artifacts` unless a different bottle already exists. If the installer or gepard folder is not known yet, search common folders, then host-only discovery:
 
 ~~~zsh
 PREFLIGHT_JSON="/tmp/uaro-crossover-preflight.json"

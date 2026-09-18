@@ -52,6 +52,8 @@ with tempfile.TemporaryDirectory() as temporary:
     assert manifest["artifact_kind"] == "community_prebuilt"
     assert manifest["provenance"]["source_revision"] == "unconfirmed"
     run(["python3", str(VERIFY), "--artifact-dir", str(cache), "--crossover-build", BUILD])
+    run(["python3", str(VERIFY), "--artifact-dir", str(cache), "--crossover-build", "26.3.0.39999"])
+    run(["python3", str(VERIFY), "--artifact-dir", str(cache), "--crossover-build", "26.4.0.1"], expect=1)
     run(["python3", str(VERIFY), "--artifact-dir", str(cache), "--crossover-build", "other"], expect=1)
 
     # A second import is idempotent; a changed cache is not silently replaced.

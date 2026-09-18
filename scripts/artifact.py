@@ -31,6 +31,18 @@ ALLOWED_SOURCE_FILES = {
 }
 
 
+def crossover_family(value: str | None) -> str:
+    text = (value or "").strip()
+    if text == "26.3" or text.startswith("26.3.0"):
+        return "26.3.0"
+    return text
+
+
+def same_crossover_family(left: str | None, right: str | None) -> bool:
+    family = crossover_family(left)
+    return family == "26.3.0" and family == crossover_family(right)
+
+
 def sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:
@@ -174,8 +186,8 @@ def import_artifact(args: argparse.Namespace) -> int:
         existing = cache / "manifest.json"
         if existing.is_file():
             manifest = json.loads(existing.read_text(encoding="utf-8"))
-            if manifest.get("crossover_build") != args.crossover_build:
-                raise ValueError("artifact cache exists for a different CrossOver build")
+            if not same_crossover_family(manifest.get("crossover_build"), args.crossover_build):
+                raise ValueError("artifact cache exists for a different CrossOver version family")
             verify_manifest(cache, manifest, args.crossover_build, "overlay")
             write_import_state(args, cache, manifest)
             print(f"PASS: artifact cache already matches {cache}")
@@ -227,10 +239,15 @@ def import_artifact(args: argparse.Namespace) -> int:
 def verify_manifest(root: Path, manifest: dict, build: str, mode: str) -> None:
     if manifest.get("schema") != 2:
         raise ValueError("artifact manifest schema must be 2")
-    if manifest.get("crossover_build") != build:
-        raise ValueError(f"artifact build {manifest.get('crossover_build')!r} does not match {build!r}")
-    if not manifest.get("crossover_public_version"):
+    if not same_crossover_family(manifest.get("crossover_build"), build):
+        raise ValueError(
+            f"artifact build {manifest.get('crossover_build')!r} is not in the 26.3.0 family of {build!r}"
+        )
+    public = manifest.get("crossover_public_version")
+    if not public:
         raise ValueError("manifest crossover_public_version is required")
+    if not same_crossover_family(str(public), "26.3.0"):
+        raise ValueError(f"manifest crossover_public_version {public!r} is not 26.3.0")
     provenance = manifest.get("provenance")
     if not isinstance(provenance, dict) or provenance.get("status") not in ("community_prebuilt", "reproducible_source"):
         raise ValueError("manifest provenance.status must be community_prebuilt or reproducible_source")

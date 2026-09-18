@@ -2,7 +2,7 @@
 
 ## Local evidence
 
-On the maintainer Mac, CrossOver reports public version `26.3.0` and product build `26.3.0.39832`.
+Supported family is CrossOver public version `26.3` / `26.3.0` with product build `26.3.0.*`. The maintainer Mac reported `26.3.0` / `26.3.0.39832`.
 
 The desktop bundle exposes:
 

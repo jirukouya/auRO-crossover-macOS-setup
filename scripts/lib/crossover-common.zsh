@@ -87,10 +87,20 @@ uo_resolve_crossover() {
     uo_die "CrossOver wine wrapper version does not match app version"
 }
 
+uo_crossover_26_3_0_family() {
+  local version="${1:-}"
+  local build="${2:-}"
+  [[ "$version" == "26.3" || "$version" == "26.3.0" || "$version" == 26.3.0.* ]] || return 1
+  [[ -z "$build" || "$build" == "26.3.0" || "$build" == 26.3.0.* ]] || return 1
+  return 0
+}
+
 uo_require_supported_build() {
-  local expected="${UA_SUPPORTED_CX_BUILD:-26.3.0.39832}"
-  [[ "$CX_BUILD" == "$expected" ]] || \
-    uo_die "unsupported CrossOver build $CX_BUILD; expected $expected"
+  uo_crossover_26_3_0_family "$CX_VERSION" "$CX_BUILD" || \
+    uo_die "unsupported CrossOver $CX_VERSION / $CX_BUILD; this skill supports the 26.3.0 line (public version 26.3 or 26.3.0, build 26.3.0.*)"
+  if [[ "$CX_BUILD" != "26.3.0.39832" ]]; then
+    uo_info "INFO: CrossOver build is $CX_BUILD (not 26.3.0.39832). The gepard DLL is for 26.3.0; continue only if stock and after probes pass."
+  fi
 }
 
 uo_require_arm64_rosetta() {

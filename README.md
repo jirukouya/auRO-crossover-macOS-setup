@@ -1,6 +1,6 @@
 # uaRO on Apple Silicon, via CrossOver
 
-**This repo gives an AI coding agent a guarded workflow that installs, repairs, verifies, and uninstalls the uaRO Windows game on your Mac through CrossOver.**
+**This repo is for an AI coding agent: you hand it the GitHub link, say install uaRO with CrossOver, and the AI reads `SKILL.md` and runs the scripts on your Mac.**
 
 [`SKILL.md`](./SKILL.md) is the execution playbook for Claude Code, OpenAI Codex, or GitHub Copilot. Hand it to an AI agent, say “install uaRO with CrossOver,” and it will run the local checks and stop when you need to provide a file, complete a GUI action, enter a password, log in, or confirm the live game test. The scripts and [`references/`](./references/) directory provide the guarded operations and supporting evidence behind that playbook.
 
@@ -44,21 +44,36 @@ This is a Wine compatibility fix, not a Gepard bypass. Wine loads builtin `wow64
 
 CrossOver's desktop app already bundles the interfaces used by this workflow, including its `bin/wine` wrapper and `cxbottle` bottle tool. The Skill discovers the actual app and build on the current Mac instead of assuming a path copied from another machine.
 
+## What you must have before the AI starts
+
+- Apple Silicon Mac
+- [CrossOver](https://www.codeweavers.com/crossover) **26.3.0** (About can say 26.3 or 26.3.0; internal build `26.3.0.*` is fine)
+- uaRO installer zip or folder with `UaRO_Setup.exe`, `UaRO_Setup-1.bin`, `UaRO_Setup-2.bin`
+- `gepard-crossover-fix` from uaRO Discord (keep the file named `wow64win.dll.crossover-26.3.0`)
+
+The AI will search Downloads/Documents/Games. If it cannot find those two packages, it will ask you for the paths once.
+
+The raw-input fix **backs up then replaces** `wow64win.dll` inside CrossOver.app. A CrossOver update can undo that; ask the AI to re-run `deploy-app`.
+
 ## How to actually run this
 
-You drive this by talking to an AI. Open this repository as the working folder in a local coding session, then use one of the following paths.
+Talk to an AI that can run commands on your Mac (Claude Code, ChatGPT/Codex, GitHub Copilot, Grok). **You do not follow the scripts by hand.**
 
-For a fresh AI session, provide the repository rather than copying `SKILL.md` alone. The AI should read the Skill, this README, `references/crossover-cli.md`, and `references/state-schema.md`, then run the relevant script's `--help` and pre-flight before it creates or changes a bottle. The Skill maps pre-flight JSON into an explicit variable ledger, so missing installer, artifact, bottle, or CrossOver state is reported as a gate instead of being guessed.
+### Desktop app
 
-### Option A — Desktop app (recommended)
-
-Use Claude Code, ChatGPT/Codex, or GitHub Copilot and paste:
+1. Download Claude, ChatGPT, Copilot, or Grok and sign in.
+2. Open a coding session and pick a folder (Documents is fine).
+3. Paste:
 
 ```text
-Read SKILL.md in this repository and install uaRO through CrossOver on this Mac. Use the supplied installer and the matching gepard-crossover-fix candidate package required by the stock probe. Stop after each phase, show the progress table, and do not launch the game until I approve the live test.
+Fetch SKILL.md from https://github.com/jirukouya/auRO-crossover-macOS-setup and follow it to install uaRO through CrossOver on this Mac. Clone the repo if you are not already in it. Search my Mac for the uaRO installer and gepard-crossover-fix. Start running; only stop when you need a file path, a GUI click, my login, or if CrossOver is the wrong build.
 ```
 
-The AI will guide the following phases:
+### Terminal
+
+Clone the repo, `cd` into it, start `claude` / `codex` / `copilot` / `grok`, and paste the same prompt.
+
+The AI will guide these phases:
 
 | Phase | What it does | What may require you |
 |---|---|---|
@@ -69,12 +84,6 @@ The AI will guide the following phases:
 | 5. OpenSetup + launch | Launch patched `setup.exe` until Gravity registry exists, then `launch-patcher`. | Click OK in OpenSetup; then Patcher Play / login. |
 
 The generated Patcher/Settings `.app` bundles have no custom icon; that is normal. Do not use `/Applications/uaRO/` Whisky experiment launchers. It does not generate a direct Game launcher.
-
-### Option B — Terminal
-
-From the repository root, start with preflight and provide exactly one installer input:
-
-Confirm the bottle name before running it; `uaro-crossover` is only the default proposal. If you use JSON preflight, keep `installer_source` paired with `installer_type`: a `zip` source becomes `INSTALLER_ZIP`, while a `directory` source becomes `INSTALLER_DIR`. The raw-input cache path is also an explicit choice; the documented `$HOME/Games/UaRO-CrossOver-artifacts` path is only a proposal and must be verified after import.
 
 ```zsh
 scripts/uaro-crossover.zsh preflight \
@@ -150,7 +159,7 @@ The full CrossOver-specific procedure is in [`AZZYAI_FIXES.md`](./AZZYAI_FIXES.m
 
 - An Apple Silicon Mac (`arm64`). The initial workflow is not validated for Intel Macs.
 - CrossOver installed locally. This repository does not install or license CrossOver for you.
-- CrossOver build `26.3.0.39832` for the current prebuilt artifact path. Other builds are blocked unless a matching artifact is obtained or rebuilt and verified.
+- CrossOver **26.3.0** (build `26.3.0.*`). The gepard prebuilt DLL is labeled `wow64win.dll.crossover-26.3.0`. Other families (26.2, 26.4, …) are blocked. A non-39832 26.3.0 patch is allowed only if stock and after probes pass; full in-game confirmation on those patch numbers is unconfirmed.
 - A uaRO account and a locally downloaded installer ZIP or staged installer directory. The account login and download remain human-driven.
 - A matching `gepard-crossover-fix` candidate package is required to run the current stock probe. Its patched DLL is deployed only if the probe reports `AFFECTED=yes`; its community prebuilt source revision, binary signature, and redistribution license are currently **unconfirmed**.
 - Enough free space for the installer cache, bottle, backups, and per-bottle overlay. Exact future sizes vary by CrossOver build and installed files.
@@ -174,7 +183,7 @@ The scoped game level keeps CrossOver and unrelated bottles. The workflow backs 
 
 ## Status
 
-**Private / experimental.** The current draft has passed local static and fixture checks, plus one user-confirmed CrossOver run on Apple Silicon with CrossOver `26.3.0.39832`:
+**Experimental, public-facing.** Local static/fixture checks pass. One user-confirmed CrossOver run on Apple Silicon used build `26.3.0.39832`. Other `26.3.0.*` builds are accepted by the scripts if probes pass; they are not separately end-to-end confirmed:
 
 - The stock raw-input probe reported `AFFECTED=yes`.
 - The overlay after-probe reported `AFFECTED=no` with zero clobbered entries.

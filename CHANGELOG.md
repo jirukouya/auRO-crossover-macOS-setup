@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [0.2.3-experimental] - 2026-09-18
+
+- Public first-run: SKILL/README tell a fresh AI to clone, search for installer + gepard-crossover-fix, use default bottle/cache names, and start executing without loading every reference first.
+- Accept any CrossOver **26.3.0** line (`26.3` / `26.3.0`, build `26.3.0.*`), not only `26.3.0.39832`. Artifact verify matches that family. Warn and still require probes when the exact patch is not 39832.
+
 ## [0.2.2-experimental] - 2026-09-18
 
 - Treat Discord `gepard-crossover-fix` Option A as the default raw-input deploy: `deploy-app` backups then replaces CrossOver.app `wow64win.dll`.

@@ -100,9 +100,9 @@
     {
       "id": 14,
       "name": "crossover-update-build-mismatch",
-      "prompt": "CrossOver updated from 26.3.0.39832 to another build. Can I keep using the imported wow64win.dll?",
-      "expected_output": "Block the prebuilt artifact and require a matching rebuild or artifact; do not modify the CrossOver app.",
-      "assertions": ["blocks mismatched build", "does not deploy DLL", "does not modify app"],
+      "prompt": "CrossOver updated from 26.3.0.39832 to another 26.3.0.x build. Can I keep using the imported wow64win.dll?",
+      "expected_output": "Stay on the 26.3.0 family: reuse the imported 26.3.0 DLL, warn that this exact patch build is unconfirmed, and require stock plus after probes. Block only if the app left 26.3.0 (for example 26.4).",
+      "assertions": ["allows 26.3.0 family", "requires probe", "blocks outside 26.3.0"],
       "files": []
     },
     {
