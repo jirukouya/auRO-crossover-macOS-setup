@@ -164,7 +164,7 @@ Use these variables only after resolving them from the current machine:
 | INSTALLER_ZIP or INSTALLER_DIR | User-supplied input | Never download or invent an installer source |
 | RAWINPUT_SOURCE_DIR | User-supplied raw-input candidate package | Source directory imported into the private cache |
 | ARTIFACT_DIR | User-selected non-iCloud cache path, or `raw_input.artifact_dir` after a prior import | Required by the current stock probe contract; default proposal is `$HOME/Games/UaRO-CrossOver-artifacts` and must be checked before use |
-| WIDTH, HEIGHT | User choice or current configuration | Explicitly confirm before writing game settings |
+| WIDTH, HEIGHT | OpenSetup / Settings; default 2560×1600 | Use 2560 and 1600 unless the user names another size. Do not stall asking. |
 | OVERLAY_DIR | Build output and state | Required only when the baseline is affected |
 | ERROR_TEXT | Exact user-reported symptom | Required when calling diagnose |
 | PREFLIGHT_JSON | Temporary capture of JSON pre-flight output | Read-only ledger input; delete or leave in `/tmp` after the run |
@@ -391,11 +391,15 @@ scripts/uaro-crossover.zsh check-gecko --bottle "$BOTTLE_NAME" --json
 
 If the CrossOver Gecko payload itself is missing, stop and ask the user to install the matching Gecko component through CrossOver, then rerun this check. Do not copy a random Gecko bundle. If the payload exists but the selected bottle has no Gecko marker, mark Step 7 pending and use the Patcher route to let CrossOver install Gecko interactively. Use an existing generated Patcher launcher when available; for a fresh install, it is safe to defer this one check until the launchers in Step 11 exist. Rerun `check-gecko` before Step 12.
 
-Write the requested game resolution explicitly:
+Write the game resolution explicitly. Default is **2560×1600** unless the user named another size:
 
 ~~~zsh
+WIDTH="${WIDTH:-2560}"
+HEIGHT="${HEIGHT:-1600}"
 scripts/uaro-crossover.zsh configure --game-dir "$GAME_DIR" --width "$WIDTH" --height "$HEIGHT" --state-file "$HOME/Library/Application Support/uaRO-CrossOver/state.json"
 ~~~
+
+`configure` also sets DirectX 9 (`RENDERSYSTEM=2`) and leaves the mouse **not** locked to the window (`WindowLock=0`). Lua is still not a substitute for OpenSetup.
 
 If the user requests keyboard compatibility settings:
 
@@ -403,15 +407,23 @@ If the user requests keyboard compatibility settings:
 scripts/uaro-crossover.zsh configure-keyboard --bottle "$BOTTLE_NAME"
 ~~~
 
-Re-run the relevant verification after each change. Resolution values are user configuration, not facts to infer from an old report.
+Re-run the relevant verification after each change.
 
-Lua config is not enough for a first launch. If `user.reg` has no `[Software\\Gravity\\RagnarokOnline]` key, the client starts OpenSetup (`setup.exe`) instead of the game. After Step 6, launch Settings through official wine and wait for the user to click OK:
+Lua config is not enough for a first launch. If `user.reg` has no `[Software\\Gravity\\RagnarokOnline]` key, the client starts OpenSetup (`setup.exe`) instead of the game. After Step 6, launch Settings through official wine:
 
 ~~~zsh
 scripts/uaro-crossover.zsh launch-setup --bottle "$BOTTLE_NAME" --game-dir "$GAME_DIR"
 ~~~
 
-Resume only after that registry key exists. Do not treat Patcher Play as the first-run OpenSetup substitute.
+**Stop and tell the user what to set in Settings / OpenSetup before OK.** OpenSetup defaults are wrong for this Mac skill. The player must:
+
+1. **Resolution:** `2560 x 1600` (or the size they asked for).
+2. **Graphics API:** **DirectX 9** (not DirectX 8 / OpenGL).
+3. **Restrict mouse to window:** **unchecked**. The box is ticked by default — clear it.
+
+Then click **OK**. Same three items if they later open `UaRO CrossOver Settings.app`. Do not open Settings and Patcher at the same time.
+
+Resume only after the Gravity registry key exists. Do not treat Patcher Play as the first-run OpenSetup substitute.
 
 ## 9. Phase D — raw-input probe and runtime choice
 
@@ -660,7 +672,7 @@ Report the result in this order:
 2. Actual CrossOver app/build, CLI, bottle, game directory, and runtime branch.
 3. Progress table with PASS, N/A, UNCONFIRMED, and BLOCKED states.
 4. Artifact identity and installer evidence.
-5. Setup patch sites and configuration values.
+5. Setup patch sites and configuration values (default OpenSetup: 2560×1600, DirectX 9, Restrict mouse to window off).
 6. Stock probe values: AFFECTED and clobbered entry count.
 7. Option A app DLL hash, or overlay manifest/after-probe, or why deploy was N/A.
 8. Launch command; no Game.app; Gravity registry present.

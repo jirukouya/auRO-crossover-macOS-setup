@@ -11,7 +11,7 @@ SCRIPT = ROOT / "scripts/configure-game.py"
 with tempfile.TemporaryDirectory() as temporary:
     game = Path(temporary) / "UaRO"
     (game / "savedata").mkdir(parents=True)
-    (game / "dinput.ini").write_text("[Input]\nWindowLock = 0\n", encoding="utf-8")
+    (game / "dinput.ini").write_text("[Input]\nWindowLock = 1\n", encoding="utf-8")
     (game / "savedata" / "OptionInfo.lua").write_text(
         "\n".join(
             [
@@ -46,7 +46,7 @@ with tempfile.TemporaryDirectory() as temporary:
     assert result.returncode == 0, (result.stdout, result.stderr)
     dinput = (game / "dinput.ini").read_text(encoding="utf-8")
     options = (game / "savedata" / "OptionInfo.lua").read_text(encoding="utf-8")
-    assert "WindowLock = 1" in dinput
+    assert "WindowLock = 0" in dinput
     assert 'OptionInfoList["RENDERSYSTEM"] = 2' in options
     assert 'OptionInfoList["ISFULLSCREENMODE"] = 0' in options
     assert 'OptionInfoList["MouseExclusive"] = 0' in options

@@ -81,7 +81,7 @@ The AI will guide these phases:
 | 2. Bottle and install | Creates or inspects the private bottle and stages the split uaRO installer safely. | Log in to uaRO and complete any installer GUI choices. |
 | 3. Patch and configure | Patches the installed `setup.exe`, checks Gecko, and writes the game configuration. | Complete an interactive Gecko step or macOS prompt if requested. |
 | 4. Raw-input route | Runs the stock probe. Affected baselines default to Option A (`deploy-app`) into CrossOver.app; overlay is optional. | Supply the gepard-crossover-fix package (keep `wow64win.dll.crossover-26.3.0` as the human name). |
-| 5. OpenSetup + launch | Launch patched `setup.exe` until Gravity registry exists, then `launch-patcher`. | Click OK in OpenSetup; then Patcher Play / login. |
+| 5. OpenSetup + launch | Launch patched `setup.exe` until Gravity registry exists, then `launch-patcher`. | In Settings: **2560×1600**, **DirectX 9**, **uncheck Restrict mouse to window**, then OK. Then Patcher Play / login. |
 
 `build-launchers` copies `references/icons/AppIcon.icns` into both `.app` bundles and signs them. Do not hand-edit the bundle to “add an icon”; that breaks codesign and can make Play look dead. The working pattern (confirmed on the maintainer Mac) is: Option A official CrossOver `bin/wine`, keep the `.app` alive while `UaRo Patcher.exe` / `uaRO.exe` run, then `codesign`. Do not `exec` Wine as the bundle executable (Dock bounce with no window) and do not `exit 0` immediately after starting Wine (looks like a crash). Do not use `/Applications/uaRO/` Whisky experiment launchers. No Game.app.
 

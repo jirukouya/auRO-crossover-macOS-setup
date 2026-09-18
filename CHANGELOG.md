@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- OpenSetup / Settings human gate: default **2560×1600**, **DirectX 9**, and **Restrict mouse to window** unchecked. `configure` writes that resolution and `WindowLock=0`.
+
 ## [0.2.4-experimental] - 2026-09-18
 
 - Ship `references/icons/AppIcon.icns` in generated Patcher/Settings apps.

@@ -90,7 +90,7 @@ def main() -> int:
             raise SystemExit(f"ERROR: required file not found: {path}")
 
     dinput_text = dinput.read_text(encoding="utf-8")
-    dinput_new, count = re.subn(r"(?m)^(\s*WindowLock\s*=\s*)\d+", r"\g<1>1", dinput_text)
+    dinput_new, count = re.subn(r"(?m)^(\s*WindowLock\s*=\s*)\d+", r"\g<1>0", dinput_text)
     if count != 1:
         raise SystemExit(f"ERROR: expected exactly one WindowLock entry, found {count}")
 
@@ -137,7 +137,7 @@ def main() -> int:
     expected_device_line = b'OptionInfoList["DX9DEVICENAME"] = "\\\\\\\\.\\\\DISPLAY1"'
     if expected_device_line not in raw:
         raise SystemExit("ERROR: DX9DEVICENAME raw bytes failed verification")
-    if b"WindowLock=1" not in dinput.read_bytes().replace(b" ", b""):
+    if b"WindowLock=0" not in dinput.read_bytes().replace(b" ", b""):
         raise SystemExit("ERROR: WindowLock failed verification")
     print(f"PASS: configured {game_dir}")
     print(f"PASS: backups {dinput_backup} and {option_backup}")
