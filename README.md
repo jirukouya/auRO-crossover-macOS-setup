@@ -6,6 +6,12 @@
 
 This repository is intentionally separate from the [Whisky workflow](https://github.com/jirukouya/auRO-whisky-macOS-setup). CrossOver bottles, Wine runtime paths, launchers, and overlays use different interfaces and must not be mixed with Whisky commands.
 
+## AzzyAI is now supported
+
+The CrossOver installation skill now includes optional support for **AzzyAI**, a third-party AI that lets your **mercenary** or **homunculus** automatically find and attack nearby monsters.
+
+After a fresh uaRO installation passes the normal live-runtime check, the skill asks whether you also want to install AzzyAI. The normal uaRO installation remains unchanged if you choose **No**.
+
 ## The problem this solves
 
 [uaRO](https://uaro.net/) is a Windows-only Ragnarok Online private server protected by **Gepard Shield 3.0**. CrossOver can run the client on Apple Silicon, but the stock Wine runtime can mishandle the client's raw-input device list. After a map loads, that Wine-side problem can surface as:
@@ -30,10 +36,11 @@ The workflow keeps the two problems separate and verifies each one independently
 | Problem | Workflow | Required proof |
 |---|---|---|
 | Installer or Settings crash | Apply the hash-locked three-site patch to the installed `setup.exe`, then check Gecko in the selected bottle. | The file hash matches a registered profile and the bottle passes the Gecko gate. |
-| Map-time raw-input / Gepard error | Run the stock probe first. If it is affected, validate a matching artifact and build a private per-bottle overlay; if it is clean, keep the CrossOver stock runtime. | Clean branch: `AFFECTED=no` with `CLOBBERED=0`. Overlay branch: the after-probe reports the same clean result. |
-| Safe launch route | Use the generated `UaRO CrossOver Patcher.app`; the clean branch may use stock Wine, while the affected branch must use the verified overlay. | Live runtime verification reports `status=pass` with `runtime=stock` for a clean baseline or `runtime=overlay` for an affected baseline. |
+| Map-time raw-input / Gepard error | Run the stock probe first. If it is affected, deploy the matching `wow64win.dll` with Option A (replace the DLL inside CrossOver.app after backing up `.orig`). Option B overlay is only if you refuse to edit the app bundle. | Probe after deploy: `AFFECTED=no` and clobbered entries = 0. Live `lsof` on `uaRO.exe` must show the deployed DLL. |
+| First launch / no game window | OpenSetup (`setup.exe`) must run once and write `HKCU\Software\Gravity\RagnarokOnline`. Lua resolution alone is not enough. | Registry key exists; `setup.exe` stayed alive for the GUI. |
+| Safe launch route | After Option A, launch `UaRo Patcher.exe` with CrossOver `bin/wine --bottle --workdir --cx-app`. Generated Patcher.app is optional. No Game.app. | `uaRO.exe` alive ≥15s; `verify-live-runtime` `status=pass`; lsof path matches deploy-app. |
 
-This is a Wine compatibility fix, not a Gepard bypass. The overlay uses the current CrossOver support files and local `ntdll.so` together with a matching patched `wow64win.dll`; it does not modify `/Applications/CrossOver.app` or install an external `ntdll.so`.
+This is a Wine compatibility fix, not a Gepard bypass. Wine loads builtin `wow64win.dll` from the directory of the loaded `ntdll.so`. Option A therefore changes `/Applications/CrossOver.app` after a `.orig` backup. Overlay-only copies are ignored if the process still loads stock ntdll.
 
 CrossOver's desktop app already bundles the interfaces used by this workflow, including its `bin/wine` wrapper and `cxbottle` bottle tool. The Skill discovers the actual app and build on the current Mac instead of assuming a path copied from another machine.
 
@@ -58,10 +65,10 @@ The AI will guide the following phases:
 | 1. Preflight | Checks Apple Silicon, Rosetta, CrossOver, build, disk space, installer, and artifact inputs. | Provide the installer and the matching raw-input candidate package before the stock probe. |
 | 2. Bottle and install | Creates or inspects the private bottle and stages the split uaRO installer safely. | Log in to uaRO and complete any installer GUI choices. |
 | 3. Patch and configure | Patches the installed `setup.exe`, checks Gecko, and writes the game configuration. | Complete an interactive Gecko step or macOS prompt if requested. |
-| 4. Raw-input route | Runs the stock probe with the candidate package. Affected baselines get a build-matched overlay and after-probe; clean baselines stay on stock Wine. | Supply or rebuild the artifact before probing if it is missing; deployment is still gated by `AFFECTED=yes`. |
-| 5. Launch and verify | Builds the supported Patcher and Settings launchers and verifies the actual loaded runtime. | Log in and confirm that a character can enter a map. |
+| 4. Raw-input route | Runs the stock probe. Affected baselines default to Option A (`deploy-app`) into CrossOver.app; overlay is optional. | Supply the gepard-crossover-fix package (keep `wow64win.dll.crossover-26.3.0` as the human name). |
+| 5. OpenSetup + launch | Launch patched `setup.exe` until Gravity registry exists, then `launch-patcher`. | Click OK in OpenSetup; then Patcher Play / login. |
 
-The default draft generates `UaRO CrossOver Patcher.app` and `UaRO CrossOver Settings.app`. It does not generate a direct Game launcher because that route can skip the patcher's update check.
+The generated Patcher/Settings `.app` bundles have no custom icon; that is normal. Do not use `/Applications/uaRO/` Whisky experiment launchers. It does not generate a direct Game launcher.
 
 ### Option B — Terminal
 
@@ -113,14 +120,31 @@ scripts/uaro-crossover.zsh diagnose \
   --error "Gepard::T Code: 3::110::12"
 ```
 
-While uaRO is running, verify that the process actually loaded the overlay:
+While uaRO is running, verify the loaded DLL:
 
 ```zsh
 scripts/uaro-crossover.zsh verify-live-runtime \
   --bottle uaro-crossover --json
+lsof -p "$(pgrep -f 'uaRO.exe' | head -1)" | grep wow64win.dll
 ```
 
-For an affected baseline, the required result is `runtime=overlay` and `status=pass`. For a clean baseline, the required result is `runtime=stock` and `status=pass`. A working game window alone is not enough. After an overlay has been built, do not use the uaRO shortcut inside the CrossOver UI; that route can load the stock runtime and reproduce the error.
+Option A success: `status=pass` and lsof shows CrossOver.app `wow64win.dll` matching `deploy-app`. Clean baseline: `runtime=stock` and `status=pass`. Overlay-only probe PASS is not enough. Dock “Running in Background” on a generated `.app` is not proof the game is running.
+
+## Installing or fixing AzzyAI
+
+Already installed uaRO through this CrossOver Skill? Ask the AI to install AzzyAI with this prompt:
+
+```text
+Read SKILL.md and AZZYAI_FIXES.md in this repository. I already have uaRO installed through CrossOver. Please install and configure AzzyAI for my mercenary or homunculus. Use the verified CrossOver game directory, back up existing AI files before changing them, apply the uaRO targeting fixes, and stop only when I need to do something inside the game. Explain each step in simple language and do not claim success until the AI actually attacks a nearby monster.
+```
+
+If AzzyAI is already installed but follows without attacking, use:
+
+```text
+Read SKILL.md and AZZYAI_FIXES.md in this repository. AzzyAI is already installed in my CrossOver uaRO setup, but my mercenary or homunculus follows me without attacking. Inspect the verified game directory first, back up every file before editing it, apply all required uaRO targeting fixes, and stop when I need to relog, resummon, or test inside the game. Explain each step simply and do not claim success from file changes alone.
+```
+
+The full CrossOver-specific procedure is in [`AZZYAI_FIXES.md`](./AZZYAI_FIXES.md). It handles the `AI/USER_AI` location, backups, `/merai` or `/hoai` activation, and the targeting fixes. The AI cannot perform the in-game activation or the final attack test for you.
 
 ## What you’ll need
 
@@ -159,6 +183,8 @@ The scoped game level keeps CrossOver and unrelated bottles. The workflow backs 
 The observed stock count of `238` clobbered entries and the approximately `869 MB` overlay size belong to that machine and run; they are not universal requirements or expected values.
 
 Still **unconfirmed** are long-duration stability, other CrossOver builds, every possible Gepard failure, and trusted provenance for the community prebuilt DLL. This result is not a universal compatibility guarantee.
+
+The core CrossOver installation has one user-confirmed acceptance run. CrossOver AzzyAI installation and in-game auto-attack still require a separate acceptance run; the documented AzzyAI targeting fixes are based on the tested uaRO/Whisky workflow.
 
 ## Changelog
 

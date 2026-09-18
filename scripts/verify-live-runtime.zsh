@@ -106,13 +106,20 @@ if (( ${#mapped[@]} > 0 )); then
   fi
 fi
 
-wow64_path="$(printf '%s\n' "${mapped[@]}" | rg -i 'wow64win\.dll' | head -1 || true)"
-ntdll_path="$(printf '%s\n' "${mapped[@]}" | rg -i 'ntdll\.so' | head -1 || true)"
+wow64_path="$(printf '%s\n' "${mapped[@]}" | grep -i 'wow64win\.dll' | head -1 || true)"
+ntdll_path="$(printf '%s\n' "${mapped[@]}" | grep -i 'ntdll\.so' | head -1 || true)"
+if [[ -z "$wow64_path" ]]; then
+  wow64_path="$(lsof -p "$PID" 2>/dev/null | awk 'tolower($0) ~ /wow64win\.dll/ {print $NF; exit}' || true)"
+fi
+if [[ -z "$ntdll_path" ]]; then
+  ntdll_path="$(lsof -p "$PID" 2>/dev/null | awk 'tolower($0) ~ /ntdll\.so/ {print $NF; exit}' || true)"
+fi
 wow64_hash=""
 ntdll_hash=""
-[[ -f "$wow64_path" ]] && wow64_hash="$(uo_hash "$wow64_path")"
-[[ -f "$ntdll_path" ]] && ntdll_hash="$(uo_hash "$ntdll_path")"
+[[ -n "$wow64_path" && -f "$wow64_path" ]] && wow64_hash="$(uo_hash "$wow64_path")"
+[[ -n "$ntdll_path" && -f "$ntdll_path" ]] && ntdll_hash="$(uo_hash "$ntdll_path")"
 expected_hash=""
+APP_DLL_HASH="$(uo_state_get app_dll_sha256 2>/dev/null || true)"
 [[ -n "$OVERLAY_DIR" && -f "$OVERLAY_DIR/overlay-manifest.json" ]] && expected_hash="$(python3 - "$OVERLAY_DIR/overlay-manifest.json" <<'PY'
 import json, sys
 try:
@@ -121,17 +128,26 @@ except (KeyError, OSError, json.JSONDecodeError):
     print("")
 PY
 )"
-
-status="unconfirmed"
-if [[ "$runtime" == "overlay" && -n "$wow64_hash" && "$wow64_hash" == "$expected_hash" && -n "$ntdll_path" ]]; then
-  status="pass"
-elif [[ "$runtime" == "stock" && "$STOCK_BASELINE_CLEAN" == "1" && -n "$wow64_path" && -n "$ntdll_path" ]]; then
-  status="pass"
-elif [[ "$runtime" == "stock" || "$runtime" == "mixed" ]]; then
-  status="blocked"
+if [[ -z "$expected_hash" && -n "$APP_DLL_HASH" ]]; then
+  expected_hash="$APP_DLL_HASH"
 fi
 
-python3 - "$PID" "$launch_path" "$runtime" "$status" "$wow64_path" "$wow64_hash" "$ntdll_path" "$ntdll_hash" "$expected_hash" "$vmmap_output" <<'PY'
+runtime_status="unconfirmed"
+APP_DLL_MATCH=0
+[[ -n "$APP_DLL_HASH" && -n "$wow64_hash" && "$wow64_hash" == "$APP_DLL_HASH" && "$wow64_path" == *"$CX_APP/"* ]] && APP_DLL_MATCH=1
+if [[ "$runtime" == "overlay" && -n "$wow64_hash" && "$wow64_hash" == "$expected_hash" && -n "$ntdll_path" ]]; then
+  runtime_status="pass"
+elif [[ "$runtime" == "stock" && "$STOCK_BASELINE_CLEAN" == "1" && -n "$wow64_path" && -n "$ntdll_path" ]]; then
+  runtime_status="pass"
+elif (( APP_DLL_MATCH )); then
+  launch_path="crossover_wine"
+  runtime="stock"
+  runtime_status="pass"
+elif [[ "$runtime" == "stock" || "$runtime" == "mixed" ]]; then
+  runtime_status="blocked"
+fi
+
+python3 - "$PID" "$launch_path" "$runtime" "$runtime_status" "$wow64_path" "$wow64_hash" "$ntdll_path" "$ntdll_hash" "$expected_hash" "$vmmap_output" <<'PY'
 import json
 import sys
 from pathlib import Path
@@ -150,7 +166,7 @@ result = {
 print(json.dumps(result, indent=2, sort_keys=True))
 PY
 
-RESULT_JSON="$(python3 - "$PID" "$launch_path" "$runtime" "$status" "$wow64_path" "$wow64_hash" "$ntdll_path" "$ntdll_hash" "$expected_hash" <<'PY'
+RESULT_JSON="$(python3 - "$PID" "$launch_path" "$runtime" "$runtime_status" "$wow64_path" "$wow64_hash" "$ntdll_path" "$ntdll_hash" "$expected_hash" <<'PY'
 import json, sys
 pid, launch_path, runtime, status, wow64_path, wow64_hash, ntdll_path, ntdll_hash, expected_hash = sys.argv[1:]
 print(json.dumps({"process":"running","pid":int(pid),"launch_path":launch_path,"runtime":runtime,"status":status,
@@ -166,15 +182,17 @@ PY
 
 if (( JSON )); then
   print -- "$RESULT_JSON"
-elif [[ "$status" == "pass" ]]; then
+elif [[ "$runtime_status" == "pass" ]]; then
   if [[ "$runtime" == "overlay" ]]; then
     uo_info "PASS: PID $PID is using the per-bottle overlay runtime"
+  elif (( APP_DLL_MATCH )); then
+    uo_info "PASS: PID $PID loaded the Option A CrossOver.app wow64win.dll"
   else
     uo_info "PASS: PID $PID is using the stock runtime and the recorded stock probe was clean"
   fi
-elif [[ "$status" == "blocked" ]]; then
-  uo_die "PID $PID is using stock or mixed CrossOver runtime; close it and relaunch UaRO CrossOver Patcher.app"
+elif [[ "$runtime_status" == "blocked" ]]; then
+  uo_die "PID $PID is not using the deployed patched wow64win.dll; close it and relaunch via official CrossOver wine or deploy-app"
 else
   uo_warn "PID $PID exists but runtime anchors are incomplete; status is unconfirmed"
 fi
-[[ "$status" != "blocked" ]] || exit 1
+[[ "$runtime_status" != "blocked" ]] || exit 1

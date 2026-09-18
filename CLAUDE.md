@@ -19,4 +19,4 @@ This repository is CrossOver-first and must not inherit executable Whisky comman
 
 ## Verification status
 
-The scripts and fixtures are locally testable. Real CrossOver bottle creation, uaRO installer execution, raw-input overlay deployment, account login, and map load are not claimed until a dedicated acceptance run records them.
+The scripts and fixtures are locally testable. The core CrossOver flow has one recorded user-confirmed acceptance run; CrossOver AzzyAI installation, activation, and in-game auto-attack remain unconfirmed until a separate acceptance run records them.

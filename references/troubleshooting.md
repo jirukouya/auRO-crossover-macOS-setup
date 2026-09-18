@@ -6,7 +6,11 @@ Inspect the installed `setup.exe`, not `UaRO_Setup.exe`. Confirm its full SHA-25
 
 ## `Gepard::T Code: 3::110::12` after map load
 
-First inspect the live launch route. If the baseline was affected and the process uses stock or mixed CrossOver paths, close it and relaunch with `UaRO CrossOver Patcher.app`. If the route is overlay, compare the loaded DLL hash with the artifact manifest and inspect stock/after probe logs. If the baseline was clean, a stock route is expected and an overlay is not evidence-based. Do not replace uaRO game DLLs based on this T-code alone.
+Inspect live `uaRO.exe` with `lsof` for `wow64win.dll`. After Option A, the path must be inside CrossOver.app and the hash must match `deploy-app`. If lsof still shows the stock `.orig` file, re-run `deploy-app`. Overlay probe PASS with no live process is not a fix. If the baseline was never affected, a remaining T-code is not proof that a DLL overlay is needed. Do not patch Gepard itself.
+
+## Game never starts / Dock “Running in Background”
+
+Confirm Gravity registry exists; if not, `launch-setup` and click OK. Launch with `launch-patcher` (official wine), not `/Applications/uaRO/` and not a Game.app. Generated `.app` bundles have no custom icon; that is normal. `repair` PASS does not mean the game starts.
 
 ## Other Gepard errors
 

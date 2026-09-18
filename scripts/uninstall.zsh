@@ -70,6 +70,11 @@ move_launcher() {
   uo_info "PASS: moved launcher to $TRASH_ROOT/"
 }
 
+if [[ -x "$CX_ROOT/bin/wineserver" ]]; then
+  WINEPREFIX="$BOTTLE_DIR" "$CX_ROOT/bin/wineserver" -k >/dev/null 2>&1 || true
+  uo_info "INFO: stopped wineserver for bottle $BOTTLE_NAME"
+fi
+
 backup_savedata
 if [[ "$LEVEL" == "game" ]]; then
   [[ -d "$GAME_DIR" ]] || uo_die "game directory is not present: $GAME_DIR"

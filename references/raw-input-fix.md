@@ -23,8 +23,8 @@ stock: AFFECTED=yes and clobbered entries > 0 before deployment
 after: AFFECTED=no and clobbered entries = 0 after deployment
 ```
 
-The current probe command requires an imported candidate package containing the probe, source, patch, and candidate `wow64win.dll` before the stock baseline can be measured. A clean stock result does not deploy that DLL; deployment is allowed only when the baseline reports `AFFECTED=yes`, `CLOBBERED=0`, and the build/source/hash gates pass. When the baseline is clean, the overlay step is `N/A` and the stock runtime is an accepted branch.
+The current probe command requires an imported candidate package containing the probe, source, patch, and candidate `wow64win.dll` (human name may be `wow64win.dll.crossover-26.3.0`) before the stock baseline can be measured. Do not pass the import cache (`manifest.json`) as `--rawinput-source-dir`. A clean stock result does not deploy that DLL; deployment is allowed only when the baseline reports `AFFECTED=yes` and clobbered entries > 0, plus build/source/hash gates.
 
-The exact pre-fix count is machine-dependent; `238` is not a portable expectation. The overlay copies the current CrossOver `ntdll.so`, never an external one, and does not modify the CrossOver app. `lsof` is not a sufficient proof for a mapped PE DLL; use probe output, `WINEDEBUG=+loaddll`, the overlay runtime anchor, and the overlay manifest.
+Default deploy is Option A: `deploy-app` backups `wow64win.dll.orig` and replaces CrossOver.app. Option B overlay must also set bottle `BinPath`/`LibPath`. `lsof` on a live `uaRO.exe` is Gate 1 for “the right file is loaded.”
 
 The supplied OpenSetup patch is a separate file chain: it targets the installed game `setup.exe`, not `UaRO_Setup.exe`. The production profile is `gepard-crossover-26.3.0`; its full input and output hashes must match before any bytes are changed.

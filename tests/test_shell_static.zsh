@@ -18,7 +18,8 @@ for script in "$ROOT"/scripts/*.zsh "$ROOT"/scripts/lib/*.zsh \
   "$ROOT"/scripts/build-launchers "$ROOT"/scripts/repair "$ROOT"/scripts/uninstall \
   "$ROOT"/scripts/check-gecko "$ROOT"/scripts/verify-installer "$ROOT"/scripts/artifact \
   "$ROOT"/scripts/build-rawinput-artifact.zsh "$ROOT"/scripts/configure-keyboard.zsh \
-  "$ROOT"/scripts/verify-live-runtime.zsh "$ROOT"/scripts/diagnose.zsh; do
+  "$ROOT"/scripts/verify-live-runtime.zsh "$ROOT"/scripts/diagnose.zsh \
+  "$ROOT"/scripts/deploy-app.zsh "$ROOT"/scripts/launch-patcher.zsh; do
   zsh -n "$script"
 done
 
@@ -55,7 +56,7 @@ if ! has_text 'runtime_mode' "$ROOT/scripts/build-launchers.zsh"; then
   exit 1
 fi
 
-for marker in 'Fresh-session execution contract' 'CX_BUILD' 'Verify-only existing installation' 'repair --bottle' 'Patcher.*client' 'allow-missing-installer'; do
+for marker in 'Fresh-session execution contract' 'CX_BUILD' 'Verify-only existing installation' 'repair --bottle' 'Patcher.*client' 'allow-missing-installer' 'deploy-app'; do
   if ! has_text "$marker" "$ROOT/SKILL.md"; then
     print -u2 -- "ERROR: Skill execution contract marker is missing: $marker"
     exit 1

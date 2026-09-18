@@ -1,6 +1,6 @@
 ---
 name: auro-crossover-macos-setup
-version: 0.2.0-experimental
+version: 0.2.2-experimental
 description: >-
   Install, repair, verify, or uninstall uaRO on Apple Silicon macOS using
   CrossOver's bundled CLI and private bottles. Trigger when the user mentions
@@ -55,10 +55,11 @@ The state file is `STATE_FILE=$HOME/Library/Application Support/uaRO-CrossOver/s
 7. Phase B — bottle and installer
 8. Phase C — setup patch and game configuration
 9. Phase D — raw-input probe and runtime choice
-10. Phase E — launchers and live verification
-11. Troubleshooting
-12. Repair, rollback, and uninstall
-13. Completion report
+10. Phase E — DLL deploy, launch, and live verification
+11. Optional AzzyAI
+12. Troubleshooting
+13. Repair, rollback, and uninstall
+14. Completion report
 
 ## 1. Quick routing — where do I start?
 
@@ -101,7 +102,7 @@ Route-specific first action:
 3. Resolve actual CrossOver app path, CLI path, version, bottle path, game path, installer path, and artifact identity from the host.
 4. Treat local files, state JSON, manifests, hashes, build labels, and command output as evidence. Draft history or README claims are not proof of a live result.
 5. Do not collect game credentials. Stop at the account-login, map/login, macOS permission, or administrator prompt and ask the user to act.
-6. After the raw-input overlay is deployed, launch only the generated Patcher and Settings launchers. Do not create or use a direct Game.app launcher.
+6. After the raw-input DLL is deployed (Option A into CrossOver.app by default), launch `UaRo Patcher.exe` through CrossOver's bundled `bin/wine --bottle --workdir --cx-app`. Do not create or use a direct Game.app launcher. Overlay launchers are Option B only.
 7. If a required value is unknown, stop that sub-step and label it unconfirmed. Do not guess a fallback.
 
 ## 3. Progress table
@@ -118,11 +119,11 @@ Maintain this table in the final report and update it during execution.
 | Step 5 | Installer GUI completed | User confirmation and setup path |
 | Step 6 | Setup patch verified | patch-setup output and byte/hash evidence |
 | Step 7 | Gecko and game configuration checked | check-gecko, configure, and optional keyboard output |
-| Step 8 | Stock runtime probe completed | AFFECTED, CLOBBERED, and artifact verification |
-| Step 9 | Runtime branch selected | Clean stock or overlay branch recorded |
-| Step 10 | Overlay built, if required | Overlay manifest and post-probe evidence |
-| Step 11 | Launchers built | Patcher and Settings launchers only |
-| Step 12 | Live runtime verified | verify-live-runtime returns status=pass |
+| Step 8 | Stock runtime probe completed | AFFECTED and clobbered *entry count* from probe output |
+| Step 9 | Runtime branch selected | Option A (default), Option B overlay, or clean stock |
+| Step 10 | DLL deployed | Option A: CrossOver.app wow64win.dll hash; Option B: overlay after-probe |
+| Step 11 | OpenSetup + launch | Gravity registry present; official wine launched Patcher |
+| Step 12 | Live runtime verified | uaRO.exe alive ≥15s; lsof wow64win.dll path/hash; verify-live-runtime status=pass |
 
 Status values:
 
@@ -256,9 +257,11 @@ The current probe contract requires a candidate gepard-crossover-fix package bef
 scripts/uaro-crossover.zsh artifact import --source-dir "$RAWINPUT_SOURCE_DIR" --cache-dir "$ARTIFACT_DIR" --crossover-build "$CX_BUILD" --crossover-public-version "$CX_VERSION"
 ~~~
 
-The candidate package must contain, at minimum:
+The candidate package is the Discord `gepard-crossover-fix` folder (or an import cache). Keep the human filename `wow64win.dll.crossover-<version>`; `artifact import` copies it to cache as `wow64win.dll`. Do not rename the user's package. Source directory is that folder; `--rawinput-source-dir` must not be the cache that already contains `manifest.json`.
 
-- wow64win.dll
+Minimum members:
+
+- `wow64win.dll` or `wow64win.dll.crossover-26.3.0`
 - rawinput_overflow_probe.exe
 - rawinput_overflow_probe.c
 - wow64win-rawinput-devicelist.patch
@@ -345,11 +348,14 @@ Record GAME_DIR and verify that both setup.exe and the expected uaRO files exist
 
 The official client update and the setup.exe compatibility patch are separate operations. Confirm that SETUP_PATH is the installed file, not the staged UaRO_Setup.exe.
 
-Run the hash-locked patch command:
+Run the hash-locked patch command (same bytes as `scripts/patch_opensetup_rosetta.py` from the gepard-crossover-fix package):
 
 ~~~zsh
 scripts/uaro-crossover.zsh patch-setup --setup "$SETUP_PATH"
+python3 scripts/patch_opensetup_rosetta.py "$SETUP_PATH"
 ~~~
+
+Either command is acceptable if the SHA matches. Prefer reporting `Already patched` / after_sha256 rather than JSON `states=pending`.
 
 The patch must verify these exact sites before changing bytes:
 
@@ -385,6 +391,14 @@ scripts/uaro-crossover.zsh configure-keyboard --bottle "$BOTTLE_NAME"
 
 Re-run the relevant verification after each change. Resolution values are user configuration, not facts to infer from an old report.
 
+Lua config is not enough for a first launch. If `user.reg` has no `[Software\\Gravity\\RagnarokOnline]` key, the client starts OpenSetup (`setup.exe`) instead of the game. After Step 6, launch Settings through official wine and wait for the user to click OK:
+
+~~~zsh
+scripts/uaro-crossover.zsh launch-setup --bottle "$BOTTLE_NAME" --game-dir "$GAME_DIR"
+~~~
+
+Resume only after that registry key exists. Do not treat Patcher Play as the first-run OpenSetup substitute.
+
 ## 9. Phase D — raw-input probe and runtime choice
 
 ### Step 8 — Run the stock probe
@@ -398,7 +412,7 @@ scripts/uaro-crossover.zsh overlay probe --bottle "$BOTTLE_NAME" --artifact-dir 
 The probe records at least:
 
 - AFFECTED=yes|no
-- CLOBBERED=0|1
+- clobbered entry count (not a 0/1 contamination flag)
 - runtime=stock
 - artifact and CrossOver build evidence
 
@@ -406,75 +420,92 @@ Interpretation:
 
 | Probe result | Runtime route |
 |---|---|
-| AFFECTED=no and CLOBBERED=0 | Keep CrossOver stock Wine. Do not deploy an overlay. |
-| AFFECTED=yes and CLOBBERED=0 | Build and verify the per-bottle overlay in Step 10. |
-| CLOBBERED=1 | Stop. The baseline was modified or contaminated; do not infer a clean result. |
+| AFFECTED=no and clobbered entries = 0 | Keep CrossOver stock Wine. Do not deploy a DLL. |
+| AFFECTED=yes and clobbered entries > 0 (often 238 on this Mac) | Deploy the matching DLL. Default is Option A (`deploy-app`). |
+| Probe binary reports a contaminated/clobbered *baseline flag* of 1 with unreadable output | Stop. Do not infer a clean result. |
 | Missing/invalid artifact or incomplete output | Stop as BLOCKED or UNCONFIRMED. |
 
-The candidate DLL is not automatically deployed. It is only eligible for deployment if the stock probe reports AFFECTED=yes and all build, source, and hash gates pass.
+Do not treat clobbered **entry count** 238 as the contamination flag. That count is the expected broken stock thunk.
+
+The candidate DLL is not automatically deployed. It is only eligible when the stock probe reports AFFECTED=yes and all build/source/hash gates pass.
 
 ### Step 9 — Select the runtime branch
 
 If the baseline is clean, keep the recorded stock probe as the evidence that no overlay is required. The current overlay verify command is for an existing overlay, so do not invoke it on the clean branch. Step 10 is N/A.
 
-If the baseline is affected, continue to Step 10. Never silently fall back to stock Wine after an affected baseline; live verification must block a stock or mixed route in that case.
+If the baseline is affected, continue to Step 10. Default deployment is Option A into CrossOver.app. Option B overlay is only if the user refuses to change the app bundle.
 
-## 10. Phase E — overlay, launchers, and live verification
+## 10. Phase E — DLL deploy, launch, and live verification
 
-### Step 10 — Build and verify the overlay only when required
+### Step 10 — Deploy the DLL (Option A default)
 
-For AFFECTED=yes, build the overlay from the exact verified candidate:
+Wine loads builtin `wow64win.dll` from the directory of the `ntdll.so` that was actually loaded. A folder that only contains the replacement DLL is ignored.
+
+**Option A (default, gepard-crossover-fix SHARE-PROMPT):** backup then replace the DLL inside CrossOver.app:
+
+~~~zsh
+scripts/uaro-crossover.zsh deploy-app --artifact-dir "$ARTIFACT_DIR" --bottle "$BOTTLE_NAME"
+~~~
+
+Keep `wow64win.dll.orig`. CrossOver updates restore stock; re-run `deploy-app`. Confirm with the official wrapper, not an overlay wine:
+
+~~~zsh
+# copy probe into the bottle first if needed
+scripts/uaro-crossover.zsh overlay probe --bottle "$BOTTLE_NAME" --artifact-dir "$ARTIFACT_DIR"
+~~~
+
+After Option A, a probe through `$CX_WINE --bottle --cx-app` must print AFFECTED=no and clobbered entries = 0.
+
+**Option B (only if the user refuses to edit CrossOver.app):** build the per-bottle overlay, then set `BinPath`/`LibPath` in `cxbottle.conf` as in the gepard-crossover-fix SKILL. Building overlay files without those bottle keys is not Option B.
 
 ~~~zsh
 scripts/uaro-crossover.zsh overlay build --bottle "$BOTTLE_NAME" --artifact-dir "$ARTIFACT_DIR"
-~~~
-
-Verify the resulting manifest and post-overlay probe:
-
-~~~zsh
 scripts/uaro-crossover.zsh artifact verify --artifact-dir "$ARTIFACT_DIR" --crossover-build "$CX_BUILD" --mode overlay
 scripts/uaro-crossover.zsh overlay verify --bottle "$BOTTLE_NAME" --artifact-dir "$ARTIFACT_DIR"
 ~~~
 
-The post-overlay probe must pass. A failed post-overlay probe blocks launcher creation.
+A failed after-probe blocks launch.
 
-### Step 11 — Build the safe launchers
+### Step 11 — Launch Patcher through official CrossOver wine
 
-Affected baseline, verified overlay:
-
-~~~zsh
-scripts/uaro-crossover.zsh build-launchers --bottle "$BOTTLE_NAME" --game-dir "$GAME_DIR" --overlay-dir "$OVERLAY_DIR"
-~~~
-
-Clean baseline, no overlay:
+Do not use `/Applications/uaRO/` Whisky experiment bundles. Optional generated apps:
 
 ~~~zsh
 scripts/uaro-crossover.zsh build-launchers --bottle "$BOTTLE_NAME" --game-dir "$GAME_DIR"
 ~~~
 
-The clean-baseline command uses CrossOver's stock Wine only when the recorded baseline is clean. The affected-baseline command uses the verified per-bottle overlay.
+Missing `.icns` is normal. `repair` only audits launcher scripts/signatures; it does not prove the game starts.
 
-Only these launchers are supported:
+Supported launch after Option A:
 
-- UaRO CrossOver Patcher.app
-- UaRO CrossOver Settings.app
+~~~zsh
+scripts/uaro-crossover.zsh launch-patcher --bottle "$BOTTLE_NAME" --game-dir "$GAME_DIR"
+~~~
 
-The Patcher launcher runs the client Patcher and applies `setup.exe` patch verification as needed before the game starts; there is no separate update shell command. It is the only supported game-launch route after an overlay has been deployed. No direct Game.app launcher is generated. If the client Patcher changes the installed files, treat that as a mutation and rerun Step 6 before live verification.
+The executable name is `UaRo Patcher.exe` (not `Patcher.exe`). Working directory must be the game directory. No Game.app. If the client Patcher replaces `setup.exe`, rerun Step 6.
 
 ### Step 12 — Verify the live runtime
 
-Launch the Patcher launcher manually and confirm that the user reaches the intended game/login screen. Then run:
+Confirm `uaRO.exe` stays up at least 15 seconds (broken thunk dies around 12s). Then:
 
 ~~~zsh
 scripts/uaro-crossover.zsh verify-live-runtime --bottle "$BOTTLE_NAME" --game-dir "$GAME_DIR" --json
 ~~~
 
+and Gate 1 from gepard-crossover-fix:
+
+~~~zsh
+P=$(pgrep -f 'uaRO.exe' | head -1)
+lsof -p "$P" | grep -o '[^ ]*wow64win.dll' | sort -u
+~~~
+
 Accepted completion states:
 
-- Overlay route: runtime=overlay and status=pass, with the expected overlay hashes.
-- Clean stock route: runtime=stock and status=pass, with AFFECTED=no and CLOBBERED=0 recorded in state.
+- Option A: `uaRO.exe` running; lsof path is CrossOver.app `wow64win.dll`; hash matches `deploy-app`; verify-live-runtime `status=pass`.
+- Option B overlay: runtime=overlay and status=pass, with overlay hashes.
+- Clean stock (never affected): runtime=stock and status=pass, with AFFECTED=no and clobbered entries = 0.
 
-A running process with no readable runtime evidence is UNCONFIRMED. If the baseline was affected, runtime=stock or runtime=mixed is BLOCKED.
+A running process with no readable runtime evidence is UNCONFIRMED. Overlay-only probe PASS is not proof the game starts. After Option A, stock+matching app DLL is pass, not blocked.
 
 For diagnosis, provide the exact user-reported symptom:
 
@@ -483,6 +514,28 @@ scripts/uaro-crossover.zsh diagnose --bottle "$BOTTLE_NAME" --error "$ERROR_TEXT
 ~~~
 
 Never report fixed based only on launcher files or a generated manifest. The live runtime check is the completion gate.
+
+## Optional: AzzyAI (mercenary/homunculus auto-attack)
+
+AzzyAI is an optional third-party Lua AI that can make a uaRO mercenary or homunculus automatically find and attack nearby monsters. It is separate from the CrossOver runtime fix and must not be installed unless the user opts in.
+
+After Step 12 passes, ask:
+
+> Would you like to install AzzyAI for your mercenary or homunculus? **Yes / No**
+
+- **No** — leave AzzyAI uninstalled and finish the CrossOver installation report.
+- **Yes** — read and follow [`AZZYAI_FIXES.md`](./AZZYAI_FIXES.md) from Step 1 through the verification steps.
+
+For the AzzyAI flow:
+
+1. Reuse the verified `GAME_DIR` from the CrossOver ledger. Do not guess a bottle path or use a Whisky command.
+2. Resolve and verify exactly `$GAME_DIR/AI/USER_AI` before copying anything; do not search another bottle.
+3. Back up the existing AI directory before replacing files, and ask before overwriting a user's existing AI.
+4. Download and copy AzzyAI, then apply the uaRO targeting fixes from the guide.
+5. Stop for the user to launch the supported Patcher, log in, and run `/merai` or `/hoai`. File installation alone does not activate AzzyAI.
+6. Resume only after the user confirms the in-game activation, then verify a fresh matching startup log and ask the user to verify that the mercenary or homunculus attacks nearby monsters.
+
+The full guide also covers the uaRO targeting cause, both independent Lua patches, `AAI_ACTORS.log`, engagement range, species-based tactics, `LiveMobID`, and reinstall recovery. Do not report AzzyAI as working from file presence alone. The in-game command and an actual attack test remain human-controlled gates.
 
 ## 11. Troubleshooting
 
@@ -493,11 +546,11 @@ Separate the layers:
 1. Confirm the correct CrossOver bottle and game directory.
 2. Confirm setup.exe patch sites A/B/C.
 3. Confirm the stock probe result.
-4. If affected, confirm overlay post-probe pass.
-5. Confirm the Patcher launcher was used.
-6. Run live runtime verification.
+4. If affected, confirm Option A app DLL hash or Option B overlay after-probe.
+5. Confirm launch used official CrossOver wine (Option A) or BinPath overlay (Option B).
+6. Run live verification: uaRO.exe ≥15s and lsof of wow64win.dll.
 
-If the process is stock or mixed after an affected baseline, relaunch through Patcher and stop treating the result as fixed. If the baseline was clean, a remaining code is not proof that the raw-input overlay is needed; inspect setup, account, server, and map-time causes separately.
+If Option A is deployed, stock CrossOver.app DLL with the matching hash is success. If lsof still shows the `.orig` stock file, `deploy-app` did not take. If the baseline was clean, a remaining T-code is not proof a DLL overlay is needed.
 
 ### setup.exe or Settings failure
 
@@ -520,7 +573,7 @@ Stop launcher creation. Re-check:
 - before/after probe state;
 - bottle path and state JSON.
 
-Do not copy DLLs into the CrossOver app bundle or a shared system Wine prefix.
+Option A *does* copy the verified DLL into CrossOver.app after `wow64win.dll.orig` exists. Do not copy an unverified DLL, and do not skip the backup. Option B must not leave CrossOver.app unchanged *and* still launch through stock ntdll.
 
 ### Artifact or installer mismatch
 
@@ -543,7 +596,7 @@ If the user supplied an exact error, add:
 scripts/uaro-crossover.zsh diagnose --bottle "$BOTTLE_NAME" --error "$ERROR_TEXT" --json
 ~~~
 
-Use the state file and current filesystem paths to decide which completed checkpoint can be resumed. A verify-only route must not create a bottle, patch `setup.exe`, import an artifact, build an overlay, or rebuild launchers.
+Use the state file and current filesystem paths to decide which completed checkpoint can be resumed. A verify-only route must not create a bottle, patch `setup.exe`, import an artifact, run `deploy-app`, build an overlay, or rebuild launchers.
 
 ### Repair is diagnostic by default
 
@@ -567,7 +620,7 @@ For other repair scopes, use the narrow command that owns that evidence: rerun `
 
 For an overlay issue, remove or move only the named per-bottle overlay after preserving its manifest and state evidence. Never delete the CrossOver app, the entire bottle root, or unrelated bottles as a repair shortcut.
 
-If the baseline was affected, do not claim that rollback to stock is safe; stock remains blocked until a new clean baseline probe is completed.
+Option A rollback: `mv "$CX_ROOT/lib/wine/x86_64-windows/wow64win.dll.orig" "$CX_ROOT/lib/wine/x86_64-windows/wow64win.dll"` after stopping wine. If the baseline was affected, do not claim unpatched stock is safe until a new clean probe.
 
 ### Uninstall
 
@@ -594,17 +647,18 @@ Report the result in this order:
 3. Progress table with PASS, N/A, UNCONFIRMED, and BLOCKED states.
 4. Artifact identity and installer evidence.
 5. Setup patch sites and configuration values.
-6. Stock probe values: AFFECTED and CLOBBERED.
-7. Overlay manifest and post-probe result, or why overlay was N/A.
-8. Launcher paths; state explicitly that no direct Game launcher is supported.
-9. Live verification result and remaining user action.
+6. Stock probe values: AFFECTED and clobbered entry count.
+7. Option A app DLL hash, or overlay manifest/after-probe, or why deploy was N/A.
+8. Launch command; no Game.app; Gravity registry present.
+9. Live verification: process age, lsof path, verify-live-runtime status.
 10. Evidence labels: 已确认, 根据证据推导, 未确认, 来源冲突, or 被阻断.
 
-A complete installation requires Step 5 and Step 12 to be PASS. A clean stock result may mark Step 10 as N/A, but only when AFFECTED=no and CLOBBERED=0 are directly recorded.
+A complete installation requires Step 5 and Step 12 to be PASS. Option A may mark overlay Step 10 details as N/A when `deploy-app` hash matches. A clean stock result may mark Step 10 as N/A only when AFFECTED=no and clobbered entries = 0.
 
 ## References
 
 - README.md — user-facing overview, supported workflow, and evidence status.
+- AZZYAI_FIXES.md — optional CrossOver-specific AzzyAI installation, activation, and uaRO targeting fixes.
 - references/runtime-routing.md — stock, overlay, and mixed-runtime rules.
 - references/raw-input-fix.md — artifact, probe, source, and hash gates.
 - references/troubleshooting.md — symptom-oriented diagnosis.

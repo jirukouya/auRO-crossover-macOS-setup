@@ -1,6 +1,6 @@
 {
   "skill_name": "auro-crossover-macos-setup",
-  "version": "0.2.0-experimental",
+  "version": "0.2.1-experimental",
   "evals": [
     {
       "id": 1,
@@ -112,6 +112,30 @@
       "expected_output": "Treat fullscreen and Dock cleanup as a non-blocking QOL phase after preserving the verified Patcher route and runtime evidence.",
       "assertions": ["preserves core route", "does not create Game.app by default", "labels QOL separately"],
       "files": []
+    },
+    {
+      "id": 16,
+      "name": "optional-azzyai-after-live-verification",
+      "prompt": "Install uaRO through CrossOver and also set up AzzyAI for my mercenary after the game works.",
+      "expected_output": "Complete or verify the core CrossOver route first, ask for explicit AzzyAI opt-in after Step 12, use exactly GAME_DIR/AI/USER_AI, record a backup and source hash, read the full AZZYAI_FIXES.md targeting and diagnostic guide, and stop for /merai or /hoai plus the live attack test.",
+      "assertions": ["asks before optional install", "uses exact CrossOver USER_AI path", "records a backup", "records source identity", "stops for in-game activation", "does not claim success from file presence"],
+      "files": ["SKILL.md", "AZZYAI_FIXES.md"]
+    },
+    {
+      "id": 17,
+      "name": "existing-crossover-azzyai-repair",
+      "prompt": "AzzyAI is already installed in my CrossOver uaRO setup, but my homunculus follows me and never attacks. Fix it.",
+      "expected_output": "Inspect the verified CrossOver game directory, back up the matching USER_AI files, apply all targeting fixes from AZZYAI_FIXES.md, reload through the game, and require an actual attack test before claiming success.",
+      "assertions": ["does not reinstall uaRO unnecessarily", "backs up Lua files", "applies both classification fixes", "requires relog or resummon", "requires live attack verification"],
+      "files": ["SKILL.md", "AZZYAI_FIXES.md"]
+    },
+    {
+      "id": 18,
+      "name": "azzyai-cross-over-version-safe-patching",
+      "prompt": "AzzyAI is installed in my CrossOver uaRO bottle. Check the uaRO targeting fixes, but the files may already be patched or may be a different AzzyAI version.",
+      "expected_output": "Use the verified GAME_DIR/AI/USER_AI path, back up the relevant Lua files, search for the actual before/after patterns, treat an already-patched file as idempotent success, and stop on an unknown pattern instead of patching by line number.",
+      "assertions": ["uses exact CrossOver USER_AI path", "backs up Lua files", "supports already-patched state", "fails closed on unknown source pattern", "does not patch by line number"],
+      "files": ["SKILL.md", "AZZYAI_FIXES.md"]
     }
   ]
 }

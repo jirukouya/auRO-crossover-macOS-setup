@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+## [0.2.2-experimental] - 2026-09-18
+
+- Treat Discord `gepard-crossover-fix` Option A as the default raw-input deploy: `deploy-app` backups then replaces CrossOver.app `wow64win.dll`.
+- Add `launch-patcher` / `launch-setup` using official `bin/wine --bottle --workdir --cx-app`.
+- Require OpenSetup / Gravity registry before Play; vendor `patch_opensetup_rosetta.py`.
+- Fix `verify-live-runtime` (`rg` → `grep`; zsh `status` → `runtime_status`; Option A app DLL is pass; `lsof` fallback).
+- Fix `overlay.zsh` manifest hashing to use the staging directory before rename.
+- Stop bottle `wineserver` on uninstall. Clarify clobbered entry count vs contamination flag.
+
+## [0.2.1-experimental] - 2026-09-18
+
+- Added optional AzzyAI support to the CrossOver Skill after Step 12 live-runtime verification.
+- Expanded the CrossOver `AZZYAI_FIXES.md` to retain the tested uaRO targeting, diagnostics, farming-range, species-tactics, `LiveMobID`, and reinstall guidance from the Whisky workflow, with only paths and launcher behavior specialized for CrossOver.
+- Added README prompts for installing AzzyAI on an existing CrossOver setup and repairing an AzzyAI installation that follows but never attacks.
+- Clarified that core CrossOver acceptance and CrossOver AzzyAI acceptance are separate verification states, and aligned generated launcher metadata with version `0.2.1`.
+
 - Added a fresh-session execution contract with explicit repository-reference loading, variable-ledger rules, pre-flight JSON field mapping, bottle discovery, and fresh/existing/verify/repair route selection.
 - Clarified that the Patcher is the client-update entry point, Gecko may require an interactive bottle marker step, and generic repair only audits or repairs generated launchers.
 - Reorganized the CrossOver Skill around fresh-session routing, a numbered progress table, and explicit Phase A–E gates modeled on the mature Whisky workflow.

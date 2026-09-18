@@ -187,8 +187,8 @@ plist = {
     "CFBundleInfoDictionaryVersion": "6.0",
     "CFBundleName": display,
     "CFBundlePackageType": "APPL",
-    "CFBundleShortVersionString": "0.2.0",
-    "CFBundleVersion": "0.2.0",
+    "CFBundleShortVersionString": "0.2.1",
+    "CFBundleVersion": "0.2.1",
     "LSMinimumSystemVersion": "13.0",
     "NSHighResolutionCapable": True,
 }

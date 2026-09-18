@@ -188,13 +188,13 @@ case "$ACTION" in
     [[ -f "$STAGING_DIR/lib/wine/x86_64-unix/ntdll.so" ]] || uo_die "overlay ntdll.so is missing"
 
     python3 - "$STAGING_DIR/overlay-manifest.json" "$CX_VERSION" "$CX_BUILD" "$OVERLAY_DIR" \
-      "$wow64_source" "$ntdll_source" <<'PY'
+      "$STAGING_DIR" "$wow64_source" "$ntdll_source" <<'PY'
 import hashlib
 import json
 import sys
 from pathlib import Path
 
-manifest_path, version, build, overlay, wow64_source, ntdll_source = sys.argv[1:]
+manifest_path, version, build, overlay, staging, wow64_source, ntdll_source = sys.argv[1:]
 def digest(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 def tree_digest(path: Path) -> str:
@@ -205,13 +205,13 @@ def tree_digest(path: Path) -> str:
             value.update(b"\0")
             value.update(child.read_bytes())
     return value.hexdigest()
-overlay_path = Path(overlay)
+overlay_path = Path(staging)
 support_paths = ["bin", "lib/wine", "lib/perl", "share"] + (["lib64"] if (overlay_path / "lib64").exists() else [])
 data = {
     "schema": 2,
     "crossover_public_version": version,
     "crossover_build": build,
-    "overlay_dir": str(overlay_path),
+    "overlay_dir": overlay,
     "artifact_files": {
         "wow64win.dll": {"source": wow64_source, "sha256": digest(Path(wow64_source))},
         "ntdll.so": {"source": ntdll_source, "sha256": digest(Path(ntdll_source))},
