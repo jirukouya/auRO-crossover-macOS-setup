@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 - OpenSetup / Settings human gate: default **2560×1600**, **DirectX 9**, and **Restrict mouse to window** unchecked. `configure` writes that resolution and `WindowLock=0`.
+- Add build-matched `artifact fetch`: download the exact GitHub Release ZIP, verify the GitHub asset digest and inner `SHA256SUMS`, safely extract it, import the validated payload, and record Release provenance in state. Manual Discord artifact import is now an explicit fallback only.
 
 ## [0.2.4-experimental] - 2026-09-18
 

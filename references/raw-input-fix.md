@@ -23,7 +23,7 @@ stock: AFFECTED=yes and clobbered entries > 0 before deployment
 after: AFFECTED=no and clobbered entries = 0 after deployment
 ```
 
-The current probe command requires an imported candidate package containing the probe, source, patch, and candidate `wow64win.dll` (human name may be `wow64win.dll.crossover-26.3.0`) before the stock baseline can be measured. Do not pass the import cache (`manifest.json`) as `--rawinput-source-dir`. A clean stock result does not deploy that DLL; deployment is allowed only when the baseline reports `AFFECTED=yes` and clobbered entries > 0, plus build/source/hash gates.
+The normal probe route first runs `artifact fetch` after CrossOver build discovery. It derives Release tag `crossover-$CX_BUILD`, requires asset `gepard-crossover-fix-$CX_BUILD-discord.zip`, verifies the GitHub asset SHA-256, safely extracts the ZIP, checks the inner `SHA256SUMS`, and imports the probe, source, patch, and candidate `wow64win.dll` into the cache. Do not ask a beginner to find or rename a Discord folder during the normal route. Do not pass the import cache (`manifest.json`) as `--rawinput-source-dir`. If the exact Release is missing or unpinned, stop as `BLOCKED`; only an explicit user-provided matching Discord folder may use the manual `artifact import` fallback. A clean stock result does not deploy that DLL; deployment is allowed only when the baseline reports `AFFECTED=yes` and clobbered entries > 0, plus build/source/hash gates.
 
 Default deploy is Option A: `deploy-app --confirm-app-change` backs up `wow64win.dll.orig` and replaces CrossOver.app. Option B overlay must also set bottle `BinPath`/`LibPath`. `lsof` on a live `uaRO.exe` is Gate 1 for “the right file is loaded.”
 

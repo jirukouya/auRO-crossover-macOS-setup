@@ -62,6 +62,11 @@ if ! has_text 'confirm-app-change' "$ROOT/scripts/deploy-app.zsh" "$ROOT/SKILL.m
   exit 1
 fi
 
+if ! has_text 'artifact fetch|SHA256SUMS|github_release_api' "$ROOT/scripts/artifact.py" "$ROOT/SKILL.md" "$ROOT/README.md"; then
+  print -u2 -- "ERROR: build-matched GitHub Release artifact fetch gate is missing"
+  exit 1
+fi
+
 if ! has_text 'probe-scope|probe-after-pass|overlay_probe_after' "$ROOT/scripts/overlay.zsh" "$ROOT/SKILL.md"; then
   print -u2 -- "ERROR: before/after probe state separation is missing"
   exit 1

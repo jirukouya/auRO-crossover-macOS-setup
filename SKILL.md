@@ -1,6 +1,6 @@
 ---
 name: auro-crossover-macos-setup
-version: 0.2.4-experimental
+version: 0.2.5-experimental
 description: >-
   Install, repair, verify, or uninstall uaRO on Apple Silicon macOS using
   CrossOver. Trigger when this GitHub repo or SKILL.md is handed to a fresh
@@ -8,7 +8,7 @@ description: >-
   or wow64win.dll, even if the user does not say “use a Skill.” Read this file
   once and start executing; do not wait for extra docs. Do not use this skill
   for Whisky-only installs.
-compatibility: Apple Silicon macOS; CrossOver 26.3.0 line (public 26.3 / 26.3.0, build 26.3.0.*); requires zsh, Python 3, CrossOver, the repository scripts/references, and a user-supplied uaRO installer.
+compatibility: Apple Silicon macOS; CrossOver 26.3.0 line (public 26.3 / 26.3.0, build 26.3.0.*); requires zsh, Python 3, CrossOver, HTTPS access to the public GitHub Release API, the repository scripts/references, and a user-supplied uaRO installer.
 ---
 
 # uaRO on macOS via CrossOver — Full Install Skill
@@ -27,9 +27,9 @@ Do these in order. Do **not** first read every file under `references/`.
    - Apple Silicon Mac
    - CrossOver **26.3.0** (About CrossOver shows 26.3 or 26.3.0; build 26.3.0.*). Other major/minor versions stop.
    - uaRO installer: `UaRO_Setup.exe` + `UaRO_Setup-1.bin` + `UaRO_Setup-2.bin` (zip or folder)
-   - `gepard-crossover-fix` folder from uaRO Discord (keep `wow64win.dll.crossover-26.3.0`; do not rename)
+   - Internet access to the repository's public, build-matched raw-input Release. The Skill downloads this package automatically; do not ask the user to find or rename a Discord folder unless the matching Release is unavailable.
    - Option A will backup then replace `wow64win.dll` **inside CrossOver.app**
-3. Search this Mac for the installer and gepard folder (`~/Downloads`, `~/Documents`, `~/Games`, Desktop). If found, use those paths. If not, ask **once** for both paths. Do not invent downloads.
+3. Search this Mac for the installer (`~/Downloads`, `~/Documents`, `~/Games`, Desktop). If it is not found, ask **once** for its path. Do not invent or download the uaRO installer. The raw-input package is fetched from GitHub after the current CrossOver build is resolved.
 4. Defaults unless a matching bottle already exists: `BOTTLE_NAME=uaro-crossover`, `ARTIFACT_DIR=$HOME/Games/UaRO-CrossOver-artifacts`. Do not stall on renaming them.
 5. If the user says “继续安装” or this is an existing/partial install, run the read-only resume planner first:
    `scripts/uaro-crossover.zsh continue --bottle uaro-crossover --json`
@@ -55,7 +55,7 @@ After the block above:
 2. Run the relevant command with `--help` before first use. Do not add undocumented flags.
 3. Keep a variable ledger from command output (`PASS` / `UNCONFIRMED` / `BLOCKED`). Do not paste placeholders.
 4. Re-derive paths from this machine. Never reuse `/Users/derekho` or another report.
-5. Missing installer or gepard package is a stop-and-ask, not a guess.
+5. Missing installer is a stop-and-ask. A missing or unavailable build-matched Release is a `BLOCKED` artifact gate; only then offer a user-supplied Discord folder as an explicit fallback. Never substitute another build's ZIP.
 
 For a JSON pre-flight result, use these exact keys to populate the ledger:
 
@@ -68,7 +68,8 @@ For a JSON pre-flight result, use these exact keys to populate the ledger:
 | BOTTLE_PATH | `bottle_dir` | PASS when the returned path exists; absent is expected before a fresh bottle is created |
 | INSTALLER_SOURCE | `installer_source` | PASS only when installer status is complete |
 | INSTALLER_TYPE | `installer_type` | `zip` maps to `INSTALLER_ZIP`; `directory` maps to `INSTALLER_DIR`; never set both |
-| RAWINPUT_SOURCE_DIR | `rawinput_source_dir` | PASS only when the source report is candidate/valid |
+| RAWINPUT_SOURCE_DIR | `rawinput_source_dir` | PASS only when the fetched or manually supplied source report is candidate/valid |
+| RAWINPUT_RELEASE | `raw_input.release` | PASS only when the exact Release asset, archive digest, and inner `SHA256SUMS` pass |
 
 The state file is `STATE_FILE=$HOME/Library/Application Support/uaRO-CrossOver/state.json`. Read it before resuming an existing installation, but never treat a previous state entry as proof that the current bottle or files still exist.
 
@@ -116,7 +117,7 @@ Route-specific first action:
 
 | Route | First action | Next decision |
 |---|---|---|
-| Fresh install | Search for installer + gepard package; use defaults `uaro-crossover` and `$HOME/Games/UaRO-CrossOver-artifacts`; run Pre-flight. | If the bottle does not exist, create it in Step 3. |
+| Fresh install | Search for the installer; use defaults `uaro-crossover` and `$HOME/Games/UaRO-CrossOver-artifacts`; run Pre-flight, then fetch the exact build-matched Release asset. | If the bottle does not exist, create it in Step 3. |
 | Existing/partial | Read state, run Pre-flight with `--allow-missing-installer` only when appropriate, then run bottle status. | Resume only after matching the state path to the current bottle and game files. |
 | Verify-only | Run `verify-live-runtime`; add `diagnose --error` when the user supplied an exact symptom. | Report `PASS`, `UNCONFIRMED`, or `BLOCKED`; do not mutate state except the normal verification record. |
 | Repair | Run diagnostic `repair` without `--fix`. | Use `--fix` only after confirming that the requested repair is limited to generated launchers. |
@@ -183,8 +184,10 @@ Use these variables only after resolving them from the current machine:
 | GAME_DIR | Installer output or existing state | Must contain the installed uaRO files |
 | SETUP_PATH | Game directory | Usually GAME_DIR/setup.exe; verify before patching |
 | INSTALLER_ZIP or INSTALLER_DIR | User-supplied input | Never download or invent an installer source |
-| RAWINPUT_SOURCE_DIR | User-supplied raw-input candidate package | Source directory imported into the private cache |
+| RAWINPUT_SOURCE_DIR | Temporary fetched source or explicit manual fallback | Only the verified source is imported into the private cache |
 | ARTIFACT_DIR | User-selected non-iCloud cache path, or `raw_input.artifact_dir` after a prior import | Required by the current stock probe contract; default proposal is `$HOME/Games/UaRO-CrossOver-artifacts` and must be checked before use |
+| RELEASE_REPO | Fixed repository | `jirukouya/auRO-crossover-macOS-setup`; do not substitute another repository |
+| RELEASE_TAG | Derived from `CX_BUILD` | `crossover-$CX_BUILD`; exact match required |
 | WIDTH, HEIGHT | OpenSetup / Settings; default 2560×1600 | Use 2560 and 1600 unless the user names another size. Do not stall asking. |
 | OVERLAY_DIR | Build output and state | Required only when the baseline is affected |
 | ERROR_TEXT | Exact user-reported symptom | Required when calling diagnose |
@@ -195,18 +198,18 @@ When a command prints a path, copy that exact path into the next command. Do not
 
 ## 5. Pre-flight and existing-state detection
 
-Run from the repository root. Do not run a command until every variable on that line has a ledger value. For a public first run, use `BOTTLE_NAME=uaro-crossover` and `ARTIFACT_DIR=$HOME/Games/UaRO-CrossOver-artifacts` unless a different bottle already exists. If the installer or gepard folder is not known yet, search common folders, then host-only discovery:
+Run from the repository root. Do not run a command until every variable on that line has a ledger value. For a public first run, use `BOTTLE_NAME=uaro-crossover` and `ARTIFACT_DIR=$HOME/Games/UaRO-CrossOver-artifacts` unless a different bottle already exists. Search common folders for the installer; do not search for a raw-input folder on the primary route because Step 2 fetches it after build resolution:
 
 ~~~zsh
 PREFLIGHT_JSON="/tmp/uaro-crossover-preflight.json"
 scripts/uaro-crossover.zsh preflight --bottle "$BOTTLE_NAME" --allow-missing-installer --json | tee "$PREFLIGHT_JSON"
 ~~~
 
-For a fresh installation with a known installer and raw-input source, prefer a single JSON pre-flight so the AI can build its ledger from one result:
+For a fresh installation with a known installer, run the JSON pre-flight first. It resolves the exact CrossOver build needed to select the Release asset:
 
 ~~~zsh
 PREFLIGHT_JSON="/tmp/uaro-crossover-preflight.json"
-scripts/uaro-crossover.zsh preflight --bottle "$BOTTLE_NAME" --installer-zip "$INSTALLER_ZIP" --rawinput-source-dir "$RAWINPUT_SOURCE_DIR" --json | tee "$PREFLIGHT_JSON"
+scripts/uaro-crossover.zsh preflight --bottle "$BOTTLE_NAME" --installer-zip "$INSTALLER_ZIP" --json | tee "$PREFLIGHT_JSON"
 ~~~
 
 If only one installer input is known, use the matching form. Set it from the pre-flight `installer_type` and `installer_source` values: `zip` means `INSTALLER_ZIP="$INSTALLER_SOURCE"`; `directory` means `INSTALLER_DIR="$INSTALLER_SOURCE"`. Keep the other variable unset:
@@ -216,7 +219,7 @@ scripts/uaro-crossover.zsh preflight --installer-zip "$INSTALLER_ZIP" --json
 scripts/uaro-crossover.zsh preflight --installer-dir "$INSTALLER_DIR" --json
 ~~~
 
-When the raw-input source directory is already available, include it in the same pre-flight run:
+Only use this optional pre-flight form when the user explicitly supplied a manual fallback source after an exact Release fetch was blocked:
 
 ~~~zsh
 scripts/uaro-crossover.zsh preflight --installer-zip "$INSTALLER_ZIP" --rawinput-source-dir "$RAWINPUT_SOURCE_DIR" --json
@@ -224,9 +227,9 @@ scripts/uaro-crossover.zsh preflight --installer-zip "$INSTALLER_ZIP" --rawinput
 
 Use --allow-missing-installer only for host-only diagnosis or when the user has explicitly chosen to complete installer staging later. It does not make installation ready.
 
-Read the JSON result and populate the ledger from the exact keys in Section 0. In particular, set `CX_VERSION` from `crossover_version`, `CX_BUILD` from `crossover_build`, `BOTTLE_PATH` from `bottle_dir`, and keep `INSTALLER_SOURCE`/`RAWINPUT_SOURCE_DIR` tied to the paths that actually passed. If you did not save JSON, use the human-readable output and do not pretend that shell variables were automatically assigned.
+Read the JSON result and populate the ledger from the exact keys in Section 0. In particular, set `CX_VERSION` from `crossover_version`, `CX_BUILD` from `crossover_build`, `BOTTLE_PATH` from `bottle_dir`, and keep `INSTALLER_SOURCE` tied to the path that actually passed. After `artifact fetch`, set `RELEASE_TAG`, `RELEASE_ASSET`, and `ARTIFACT_DIR` from its output and the `raw_input.release` state record. If you did not save JSON, use the human-readable output and do not pretend that shell variables were automatically assigned.
 
-After `artifact import`, set `ARTIFACT_DIR` to the exact cache path printed by the command and confirmed by `raw_input.artifact_dir` in `STATE_FILE`. When resuming, prefer that state path only if it still exists and its manifest verifies against the current `CX_BUILD`. A path used only as a proposed default is not evidence that an artifact was imported.
+After `artifact fetch` or an explicit manual `artifact import`, set `ARTIFACT_DIR` to the exact cache path printed by the command and confirmed by `raw_input.artifact_dir` in `STATE_FILE`. When resuming, prefer that state path only if it still exists, its manifest verifies against the current `CX_BUILD`, and the recorded Release asset (when present) still matches the current build. A path used only as a proposed default is not evidence that an artifact was imported.
 
 When JSON was saved, print the ledger candidates without evaluating them as shell code:
 
@@ -284,15 +287,22 @@ Use the pre-flight output as the source of truth. Confirm the actual app build, 
 
 Do not continue on a guessed CrossOver version or a CLI that belongs to another app installation.
 
-### Step 2 — Import and verify the candidate artifact and installer
+### Step 2 — Download, verify, and import the build-matched artifact
 
-The current probe contract requires a candidate gepard-crossover-fix package before the stock probe can run. Import it before Step 8:
+After Step 1 resolves `CX_BUILD`, fetch the public Release whose tag and asset name contain that exact build. This keeps a beginner from hunting for a Discord folder and prevents silently using a DLL built for another CrossOver patch version:
 
 ~~~zsh
-scripts/uaro-crossover.zsh artifact import --source-dir "$RAWINPUT_SOURCE_DIR" --cache-dir "$ARTIFACT_DIR" --crossover-build "$CX_BUILD" --crossover-public-version "$CX_VERSION"
+scripts/uaro-crossover.zsh artifact fetch \
+  --cache-dir "$ARTIFACT_DIR" \
+  --crossover-build "$CX_BUILD" \
+  --crossover-public-version "$CX_VERSION"
 ~~~
 
-The candidate package is the Discord `gepard-crossover-fix` folder (or an import cache). Keep the human filename `wow64win.dll.crossover-<version>`; `artifact import` copies it to cache as `wow64win.dll`. Do not rename the user's package. Source directory is that folder; `--rawinput-source-dir` must not be the cache that already contains `manifest.json`.
+`artifact fetch` derives the tag `crossover-$CX_BUILD`, calls the public GitHub Release API for `jirukouya/auRO-crossover-macOS-setup`, and requires the exact asset `gepard-crossover-fix-$CX_BUILD-discord.zip`. It downloads to a temporary directory, verifies the GitHub asset SHA-256, rejects unsafe ZIP paths, verifies the inner `SHA256SUMS`, validates the four expected members and PE architectures, and imports only the verified files into `ARTIFACT_DIR`. The temporary ZIP and extraction directory are removed after import; the state file records the Release tag, asset URL, archive digest, and inner checksum result.
+
+The current published artifact is a community prebuilt and remains experimental. Its binary signature, source revision, and redistribution license are still `unconfirmed`; a successful download is not permission to deploy it. The stock probe must still pass its `AFFECTED` and clobbered-entry gate before `deploy-app` is allowed.
+
+If the exact Release or its digest is unavailable, stop as `BLOCKED` and show the user the exact build and missing asset. Only after that blocker may the user explicitly provide a matching Discord `gepard-crossover-fix` folder for the existing `artifact import` fallback. Do not use a Release or ZIP for another build. A manual source directory must keep the human filename `wow64win.dll.crossover-26.3.0`; do not rename the user's package. Never pass an import cache containing `manifest.json` as `--rawinput-source-dir`.
 
 Minimum members:
 
@@ -317,7 +327,7 @@ Required installer members are exactly:
 - UaRO_Setup-1.bin — installer data part one.
 - UaRO_Setup-2.bin — installer data part two.
 
-If the candidate package or installer is missing, stop and report the blocker. Do not substitute a web download, an unverified DLL, or a same-name artifact from another build.
+If the installer or the exact build-matched Release is missing, stop and report the blocker. Do not substitute an unverified DLL, a same-name artifact from another build, or a guessed download URL.
 
 ## 7. Phase B — bottle and installer
 

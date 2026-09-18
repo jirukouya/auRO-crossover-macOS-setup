@@ -49,9 +49,9 @@ CrossOver's desktop app already bundles the interfaces used by this workflow, in
 - Apple Silicon Mac
 - [CrossOver](https://www.codeweavers.com/crossover) **26.3.0** (About can say 26.3 or 26.3.0; internal build `26.3.0.*` is fine)
 - uaRO installer zip or folder with `UaRO_Setup.exe`, `UaRO_Setup-1.bin`, `UaRO_Setup-2.bin`
-- `gepard-crossover-fix` from uaRO Discord (keep the file named `wow64win.dll.crossover-26.3.0`)
+- Internet access to the public GitHub Release for the exact CrossOver build. The Skill downloads and verifies the raw-input artifact automatically; a Discord folder is only a manual fallback if that exact Release is unavailable.
 
-The AI will search Downloads/Documents/Games. If it cannot find those two packages, it will ask you for the paths once.
+The AI will search Downloads/Documents/Games for the installer. If it cannot find it, it will ask you for the path once. It will not ask you to hunt for a second patch ZIP during the normal route.
 
 The raw-input fix **backs up then replaces** `wow64win.dll` inside CrossOver.app. This is a shared application-level change and therefore requires `--confirm-app-change`; review the impact before running it. A CrossOver update can undo that; ask the AI to re-run `deploy-app --confirm-app-change`.
 
@@ -66,7 +66,7 @@ Talk to an AI that can run commands on your Mac (Claude Code, ChatGPT/Codex, Git
 3. Paste:
 
 ```text
-Fetch SKILL.md from https://github.com/jirukouya/auRO-crossover-macOS-setup and follow it to install uaRO through CrossOver on this Mac. Clone the repo if you are not already in it. Search my Mac for the uaRO installer and gepard-crossover-fix. Start running; only stop when you need a file path, a GUI click, my login, or if CrossOver is the wrong build.
+Fetch SKILL.md from https://github.com/jirukouya/auRO-crossover-macOS-setup and follow it to install uaRO through CrossOver on this Mac. Clone the repo if you are not already in it. Search my Mac for the uaRO installer; fetch the exact build-matched raw-input artifact from the repository Release and verify it before use. Start running; only stop when you need a file path, a GUI click, my login, a missing Release asset, or if CrossOver is the wrong build.
 ```
 
 ### Terminal
@@ -77,10 +77,10 @@ The AI will guide these phases:
 
 | Phase | What it does | What may require you |
 |---|---|---|
-| 1. Preflight | Checks Apple Silicon, Rosetta, CrossOver, build, disk space, installer, and artifact inputs. | Provide the installer and the matching raw-input candidate package before the stock probe. |
+| 1. Preflight | Checks Apple Silicon, Rosetta, CrossOver, build, disk space, and installer. | Provide the installer; the exact raw-input Release is selected after the build is known. |
 | 2. Bottle and install | Creates or inspects the private bottle and stages the split uaRO installer safely. | Log in to uaRO and complete any installer GUI choices. |
 | 3. Patch and configure | Patches the installed `setup.exe`, checks Gecko, and writes the game configuration. | Complete an interactive Gecko step or macOS prompt if requested. |
-| 4. Raw-input route | Runs the stock probe. Affected baselines default to Option A (`deploy-app`) into CrossOver.app; overlay is optional. | Supply the gepard-crossover-fix package (keep `wow64win.dll.crossover-26.3.0` as the human name). |
+| 4. Raw-input route | Fetches and verifies the exact build-matched Release ZIP, runs the stock probe, then defaults to Option A (`deploy-app`) into CrossOver.app only when affected; overlay is optional. | Only provide a manual matching Discord package if the exact Release is unavailable. |
 | 5. Registration + launchers + SOP | Verify CrossOver menu/association export without desktop control, build signed on-demand Patcher/Settings apps, show the Settings SOP, then use `launch-patcher`. | Registration PASS; both launchers signed; user is told: **2560×1600**, **DirectX 9**, **uncheck Restrict mouse to window**, then OK. Then Patcher Play / login. |
 
 `verify-registration` checks the CrossOver menu/association export without desktop automation and automatically performs one safe `cxbottle --install` repair during installation when needed. `build-launchers` copies `references/icons/AppIcon.icns` into both `.app` bundles and signs them under `~/Applications` by default. The launchers use CrossOver `--wait-children`, set `LSUIElement`, and exit when the requested Windows program exits; they are not resident apps. Do not hand-edit the bundle to “add an icon”; that breaks codesign and can make Play look dead. Do not add LaunchAgents, login items, daemons, or polling loops. Do not use `/Applications/uaRO/` Whisky experiment launchers. No Game.app.
@@ -99,15 +99,16 @@ UaRO_Setup-1.bin
 UaRO_Setup-2.bin
 ```
 
-Import the matching candidate package into a non-iCloud cache before running the stock probe. The current probe validates the package even when the final result is clean; its patched DLL is deployed only when the probe reports `AFFECTED=yes`:
+The Skill fetches the matching candidate package into a non-iCloud cache before running the stock probe. It verifies the GitHub asset digest, rejects unsafe ZIP paths, verifies the inner `SHA256SUMS`, and validates the exact four payload members. The current probe validates the package even when the final result is clean; its patched DLL is deployed only when the probe reports `AFFECTED=yes`:
 
 ```zsh
-scripts/uaro-crossover.zsh artifact import \
-  --source-dir "/path/to/gepard-crossover-fix" \
+scripts/uaro-crossover.zsh artifact fetch \
   --cache-dir "$HOME/Games/UaRO-CrossOver-artifacts" \
   --crossover-build 26.3.0.39832 \
   --crossover-public-version 26.3.0
 ```
+
+The fetch command derives Release tag `crossover-26.3.0.39832` and asset `gepard-crossover-fix-26.3.0.39832-discord.zip`. If that exact Release or its GitHub SHA-256 digest is unavailable, the Skill stops as `BLOCKED` instead of using a different build. A manually supplied Discord folder remains an explicit fallback through `artifact import`.
 
 Do not skip the phase gates or substitute Whisky commands. The complete bottle, installer, patch, Gecko, configuration, overlay, launcher, and live-runtime sequence is defined in [`SKILL.md`](./SKILL.md).
 
@@ -175,7 +176,7 @@ The full CrossOver-specific procedure is in [`AZZYAI_FIXES.md`](./AZZYAI_FIXES.m
 - CrossOver installed locally. This repository does not install or license CrossOver for you.
 - CrossOver **26.3.0** (build `26.3.0.*`). The gepard prebuilt DLL is labeled `wow64win.dll.crossover-26.3.0`. Other families (26.2, 26.4, …) are blocked. A non-39832 26.3.0 patch is allowed only if stock and after probes pass; full in-game confirmation on those patch numbers is unconfirmed.
 - A uaRO account and a locally downloaded installer ZIP or staged installer directory. The account login and download remain human-driven.
-- A matching `gepard-crossover-fix` candidate package is required to run the current stock probe. Its patched DLL is deployed only if the probe reports `AFFECTED=yes`; its community prebuilt source revision, binary signature, and redistribution license are currently **unconfirmed**.
+- A matching build-specific raw-input Release asset is required to run the current stock probe. The Skill fetches it automatically and deploys its patched DLL only if the probe reports `AFFECTED=yes`; its community prebuilt source revision, binary signature, and redistribution license are currently **unconfirmed**.
 - Enough free space for the installer cache, bottle, backups, and per-bottle overlay. Exact future sizes vary by CrossOver build and installed files.
 - Time to handle the human-controlled steps: account login, installer GUI, Gecko if requested, macOS prompts, first game login, and map-load confirmation.
 

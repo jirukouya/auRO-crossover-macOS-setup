@@ -13,3 +13,9 @@ Important sections:
 - `e2e`: user-confirmed Patcher, login, map-load, and T-code observations.
 
 Evidence levels remain separate from command exit codes. In particular, a stock probe may report `AFFECTED=yes` with a non-zero guest exit, while a clean after-probe is not by itself end-to-end proof.
+
+When the artifact came from the public Release route, `raw_input.release` records the
+repository, exact tag, asset name and URL, downloaded archive SHA-256, the digest source
+(`github_release_api`), and whether the inner `SHA256SUMS` passed. A release record proves
+which bytes were fetched; it does not prove that the community binary is signed or
+licensed for redistribution.
