@@ -232,6 +232,12 @@ create_launcher "UaRO CrossOver Patcher" "com.jirukouya.uaro.crossover.patcher" 
 create_launcher "UaRO CrossOver Settings" "com.jirukouya.uaro.crossover.settings" \
   "UaRO CrossOver Settings" "$SETUP_WIN"
 
+if "$CX_ROOT/bin/cxmenu" --sync --bottle "$BOTTLE_NAME" --mode install >/dev/null 2>&1; then
+  uo_info "PASS: refreshed CrossOver menu registration after launcher creation"
+else
+  uo_warn "CrossOver menu refresh after launcher creation was not confirmed; run verify-registration --repair"
+fi
+
 GAME_DIR="$GAME_DIR"
 uo_write_state launchers built
 uo_info "INFO: launcher runtime=$RUNTIME_MODE"

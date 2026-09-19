@@ -53,6 +53,12 @@ if [[ -d "$BOTTLE_DIR/drive_c" ]]; then
   BOTTLE_STATUS="present"
 fi
 STATE_FILE_PATH="$(uo_state_file)"
+# Prepare the user-local state directory before checking writability. A clean
+# install may have no prior state directory at all; creating this narrow
+# directory avoids turning that normal first-run condition into UNCONFIRMED.
+if [[ ! -d "${STATE_FILE_PATH:h}" ]]; then
+  mkdir -p "${STATE_FILE_PATH:h}" 2>/dev/null || true
+fi
 STATE_STATUS="unconfirmed"
 if uo_state_writable; then
   STATE_STATUS="pass"

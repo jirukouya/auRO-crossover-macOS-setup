@@ -6,7 +6,7 @@ Important sections:
 
 - `installer`: ZIP/member hashes and staging state.
 - `setup`: installed `setup.exe`, profile, before/after hashes, backup, and site statuses.
-- `raw_input`: artifact, stock probe, overlay, after probe, and artifact status.
+- `raw_input`: artifact, stock probe, overlay, after probe, and artifact status. Probe status is semantic: `pass` means `AFFECTED=no` with clobbered entries `0`, `affected` means `AFFECTED=yes` with a positive clobbered count, and `unconfirmed` means the output is incomplete or contradictory. The top-level status must not say `affected` for a clean stock probe.
 - `launch`: launcher path, PID, runtime route, live `ntdll.so`/`wow64win.dll` evidence, and log.
 - `registration`: CrossOver `cxbottle.conf`/`cxmenu.conf`/menu plist evidence, exact shortcut and exported command paths, `cxmenu --query` return code and `CXMenuMacOSX` match count, build match, repair attempt, and status.
 - `launchers`: actual Patcher/Settings Applications directory (normally `/Applications`, with a reported `~/Applications` fallback), runtime route, and signature verification status.

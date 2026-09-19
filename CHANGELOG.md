@@ -7,6 +7,7 @@
 - Harden CrossOver registration with `cxmenu --query` / `CXMenuMacOSX` evidence and one `cxmenu --sync` repair after `cxbottle --install`.
 - Default signed Patcher/Settings launchers to `/Applications` with an explicit `~/Applications` fallback; prevent launcher Python bytecode caches from invalidating codesign.
 - Make live PID discovery reject diagnostic shells, require an unambiguous `uaRO.exe`, record process age, and use collision-safe temporary directories; add top-level `bottle --help` and `overlay --help` handling.
+- Preserve Windows backslashes during live PID validation, align probe state with semantic `AFFECTED`/clobbered results, refresh CrossOver menu registration after launcher creation, prepare the state directory during preflight, show staging progress for large installer parts, and bring CrossOver forward before the interactive installer.
 
 ## [0.2.4-experimental] - 2026-09-18
 

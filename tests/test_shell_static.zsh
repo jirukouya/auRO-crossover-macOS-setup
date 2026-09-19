@@ -119,6 +119,31 @@ if ! has_text 'comm=,args=|find-uaro-process' "$ROOT/scripts/verify-live-runtime
   exit 1
 fi
 
+if ! has_text 'print -r -- "\$PROCESS_INFO"' "$ROOT/scripts/verify-live-runtime.zsh"; then
+  print -u2 -- "ERROR: live runtime must preserve Windows backslashes during PID validation"
+  exit 1
+fi
+
+if ! has_text 'probe_state_status|record_probe_state stock.*probe_state_status' "$ROOT/scripts/overlay.zsh"; then
+  print -u2 -- "ERROR: probe state must reflect semantic AFFECTED/clobbered results"
+  exit 1
+fi
+
+if ! has_text 'cxmenu.*--sync.*--bottle.*--mode install' "$ROOT/scripts/build-launchers.zsh"; then
+  print -u2 -- "ERROR: launcher creation must refresh CrossOver menu registration"
+  exit 1
+fi
+
+if ! has_text 'STATE_FILE_PATH:h' "$ROOT/scripts/preflight.zsh" || ! has_text 'mkdir -p' "$ROOT/scripts/preflight.zsh"; then
+  print -u2 -- "ERROR: preflight must prepare the user-local state directory"
+  exit 1
+fi
+
+if ! has_text 'staging.*large installer parts' "$ROOT/scripts/stage-installer.zsh"; then
+  print -u2 -- "ERROR: installer staging progress message is missing"
+  exit 1
+fi
+
 if ! has_text 'APPLICATIONS_DIR="/Applications"|/Applications' "$ROOT/scripts/build-launchers.zsh" "$ROOT/scripts/repair.zsh" "$ROOT/SKILL.md"; then
   print -u2 -- "ERROR: system Applications launcher default is missing"
   exit 1

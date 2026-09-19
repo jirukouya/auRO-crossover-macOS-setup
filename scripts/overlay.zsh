@@ -106,6 +106,16 @@ print(values[-1])
 PY
 }
 
+probe_state_status() {
+  if [[ "$PROBE_AFFECTED" == "no" && "$PROBE_CLOBBERED" == "0" ]]; then
+    print -- "pass"
+  elif [[ "$PROBE_AFFECTED" == "yes" && "$PROBE_CLOBBERED" == <-> && "$PROBE_CLOBBERED" -gt 0 ]]; then
+    print -- "affected"
+  else
+    print -- "unconfirmed"
+  fi
+}
+
 
 run_probe() {
   local wine_cmd="$1"
@@ -154,7 +164,7 @@ case "$ACTION" in
     "${VERIFY_PROBE_ARTIFACT[@]}"
     if [[ "$PROBE_SCOPE" == "before" ]]; then
       run_probe "$CX_WINE" before 0
-      record_probe_state stock affected
+      record_probe_state stock "$(probe_state_status)"
       uo_state_set overlay_probe_before pass
       uo_state_set overlay_probe_before_log "$PROBE_LOG"
       uo_state_set overlay_probe_before_affected "$PROBE_AFFECTED"
@@ -162,7 +172,7 @@ case "$ACTION" in
       uo_write_state overlay probe-before-pass
     else
       run_probe "$CX_WINE" after 1
-      record_probe_state after clean
+      record_probe_state after "$(probe_state_status)"
       uo_state_set overlay_probe_after pass
       uo_state_set overlay_probe_after_log "$PROBE_LOG"
       uo_state_set overlay_probe_after_affected "$PROBE_AFFECTED"
@@ -292,7 +302,7 @@ for relative, expected in manifest.get("support_hashes", {}).items():
         raise SystemExit(f"ERROR: overlay support tree SHA-256 mismatch for {relative}")
 PY
     run_probe "$OVERLAY_DIR/bin/wine" after 1
-    record_probe_state after clean
+    record_probe_state after "$(probe_state_status)"
     uo_state_set overlay_probe_after pass
     uo_state_set overlay_probe_after_log "$PROBE_LOG"
     uo_state_set overlay_probe_after_affected "$PROBE_AFFECTED"

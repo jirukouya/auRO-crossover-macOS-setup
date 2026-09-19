@@ -1,6 +1,6 @@
 ---
 name: auro-crossover-macos-setup
-version: 0.2.6-experimental
+version: 0.2.7-experimental
 description: >-
   Install, repair, verify, or uninstall uaRO on Apple Silicon macOS using
   CrossOver. Trigger when this GitHub repo or SKILL.md is handed to a fresh
@@ -73,7 +73,7 @@ For a JSON pre-flight result, use these exact keys to populate the ledger:
 | RAWINPUT_SOURCE_DIR | `rawinput_source_dir` | PASS only when the fetched or manually supplied source report is candidate/valid |
 | RAWINPUT_RELEASE | `raw_input.release` | PASS only when the exact Release asset, archive digest, and inner `SHA256SUMS` pass |
 
-The state file is `STATE_FILE=$HOME/Library/Application Support/uaRO-CrossOver/state.json`. Read it before resuming an existing installation, but never treat a previous state entry as proof that the current bottle or files still exist.
+The state file is `STATE_FILE=$HOME/Library/Application Support/uaRO-CrossOver/state.json`. Preflight prepares this narrow user-local directory when it is missing. Read the state before resuming an existing installation, but never treat a previous state entry as proof that the current bottle or files still exist.
 
 ## Contents
 
@@ -365,7 +365,7 @@ Or, for an extracted source:
 scripts/stage-installer.zsh --bottle "$BOTTLE_NAME" --installer-dir "$INSTALLER_DIR"
 ~~~
 
-Preserve the exact split-installer member names. Do not flatten the package with ditto or use a mixed installer directory.
+Preserve the exact split-installer member names. Do not flatten the package with ditto or use a mixed installer directory. Staging prints a progress line before each member because the two `.bin` parts are large; a quiet period during extraction is expected, but the per-member progress line is the evidence that work started.
 
 ### Step 5 — Run the installer GUI
 
@@ -545,7 +545,7 @@ Do not use `/Applications/uaRO/` Whisky experiment bundles. Build the supported 
 scripts/uaro-crossover.zsh build-launchers --bottle "$BOTTLE_NAME" --game-dir "$GAME_DIR"
 ~~~
 
-By default the bundles are created under `/Applications`; if that directory is not writable, the command falls back to `$HOME/Applications` and prints the actual path. They are on-demand launchers, not resident apps: they use CrossOver `--wait-children`, exit when Settings/Patcher and their children exit, and set `LSUIElement` so macOS does not present them as ordinary Dock applications. `build-launchers` embeds `references/icons/AppIcon.icns` and signs both bundles. Do not add LaunchAgents, login items, daemons, or a polling loop. `repair` audits registration, launcher scripts, signatures, and on-demand lifecycle metadata; it does not prove the game starts.
+By default the bundles are created under `/Applications`; if that directory is not writable, the command falls back to `$HOME/Applications` and prints the actual path. After creating the bundles it refreshes CrossOver's menu export once; the following `verify-registration` command remains the hard gate. They are on-demand launchers, not resident apps: they use CrossOver `--wait-children`, exit when Settings/Patcher and their children exit, and set `LSUIElement` so macOS does not present them as ordinary Dock applications. `build-launchers` embeds `references/icons/AppIcon.icns` and signs both bundles. Do not add LaunchAgents, login items, daemons, or a polling loop. `repair` audits registration, launcher scripts, signatures, and on-demand lifecycle metadata; it does not prove the game starts.
 
 Re-run the registration check after building launchers:
 

@@ -74,6 +74,7 @@ typeset -a staged_members=()
 for name in "${names[@]}"; do
   target_path="$STAGE_DIR/$name"
   part_path="$STAGE_DIR/$name.part.$$"
+  uo_info "INFO: staging $name; large installer parts may take a while"
   if [[ "$INSTALLER_TYPE" == "zip" ]]; then
     /usr/bin/unzip -p "$SOURCE_ZIP" "$name" > "$part_path"
   else
@@ -126,6 +127,9 @@ uo_write_state installer staged
 if (( RUN_INSTALLER )); then
   uo_info "Opening the interactive uaRO installer in CrossOver. Complete only the user-level/default installation choices."
   uo_info "Human gate: choose current-user installation, keep the default destination, and uncheck automatic game launch on the final page."
+  if command -v open >/dev/null 2>&1; then
+    open -a "$CX_APP" >/dev/null 2>&1 || uo_warn "CrossOver could not be brought to the foreground; check it with Cmd-Tab"
+  fi
   caffeinate -i "$CX_WINE" --wait --bottle "$BOTTLE_NAME" --workdir "$STAGE_DIR" --cx-app 'C:\UaROInstaller\UaRO_Setup.exe'
   GAME_DIR="$(uo_find_game_dir)" || uo_die "installer exited but uaRO.exe was not found in the bottle"
   uo_info "PASS: uaRO game directory: $GAME_DIR"

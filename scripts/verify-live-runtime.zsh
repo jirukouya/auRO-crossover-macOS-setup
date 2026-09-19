@@ -82,7 +82,7 @@ fi
 [[ "$PID" == <-> ]] || uo_die "invalid PID: $PID"
 PROCESS_INFO="$(ps -p "$PID" -o pid=,comm=,args= 2>/dev/null || true)"
 [[ -n "$PROCESS_INFO" ]] || uo_die "PID $PID is not running"
-if ! print -- "$PROCESS_INFO" | python3 "$SCRIPT_DIR/find-uaro-process.py" --pid "$PID"; then
+if ! print -r -- "$PROCESS_INFO" | python3 "$SCRIPT_DIR/find-uaro-process.py" --pid "$PID"; then
   uo_die "PID $PID is not a uaRO.exe process"
 fi
 PROCESS_AGE_SECONDS="$(ps -p "$PID" -o etime= 2>/dev/null | python3 -c '
