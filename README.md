@@ -38,7 +38,7 @@ The workflow keeps the two problems separate and verifies each one independently
 | Installer or Settings crash | Apply the hash-locked three-site patch to the installed `setup.exe`, then check Gecko in the selected bottle. | The file hash matches a registered profile and the bottle passes the Gecko gate. |
 | Map-time raw-input / Gepard error | Run the stock probe first. If it is affected, deploy the matching `wow64win.dll` with Option A (replace the DLL inside CrossOver.app after backing up `.orig`). Option B overlay is only if you refuse to edit the app bundle. | Probe after deploy: `AFFECTED=no` and clobbered entries = 0. Live `lsof` on `uaRO.exe` must show the deployed DLL. |
 | First launch / no game window | Show the user the OpenSetup SOP; the skill does not guess or machine-check their Settings selections. | User is told to use 2560×1600, DirectX 9, and turn off Restrict mouse to window. |
-| Safe launch route | After registration and Option A, launch `UaRo Patcher.exe` with CrossOver `bin/wine --bottle --workdir --wait-children --cx-app`. Generated Patcher/Settings apps are on-demand launchers under `~/Applications` by default. No Game.app or resident daemon. | Registration PASS; both launchers signed and on-demand; `uaRO.exe` alive ≥15s; `verify-live-runtime` `status=pass`; lsof path matches deploy-app. |
+| Safe launch route | After registration and Option A, launch `UaRo Patcher.exe` with CrossOver `bin/wine --bottle --workdir --wait-children --cx-app`. Generated Patcher/Settings apps are on-demand launchers under `/Applications` by default, with a reported `~/Applications` fallback when needed. No Game.app or resident daemon. | Registration PASS; both launchers signed and on-demand; `uaRO.exe` alive ≥15s; `verify-live-runtime` `status=pass`; lsof path matches deploy-app. |
 
 This is a Wine compatibility fix, not a Gepard bypass. Wine loads builtin `wow64win.dll` from the directory of the loaded `ntdll.so`. Option A therefore changes `/Applications/CrossOver.app` after a `.orig` backup. Overlay-only copies are ignored if the process still loads stock ntdll.
 
@@ -81,9 +81,9 @@ The AI will guide these phases:
 | 2. Bottle and install | Creates or inspects the private bottle and stages the split uaRO installer safely. | Log in to uaRO and complete any installer GUI choices. |
 | 3. Patch and configure | Patches the installed `setup.exe`, checks Gecko, and writes the game configuration. | Complete an interactive Gecko step or macOS prompt if requested. |
 | 4. Raw-input route | Fetches and verifies the exact build-matched Release ZIP, runs the stock probe, then defaults to Option A (`deploy-app`) into CrossOver.app only when affected; overlay is optional. | Only provide a manual matching Discord package if the exact Release is unavailable. |
-| 5. Registration + launchers + SOP | Verify CrossOver menu/association export without desktop control, build signed on-demand Patcher/Settings apps, show the Settings SOP, then use `launch-patcher`. | Registration PASS; both launchers signed; user is told: **2560×1600**, **DirectX 9**, **uncheck Restrict mouse to window**, then OK. Then Patcher Play / login. |
+| 5. Registration + launchers + SOP | Verify CrossOver menu/association export and `cxmenu --query` without desktop control, build signed on-demand Patcher/Settings apps, show the Settings SOP, then use `launch-patcher`. | Registration PASS; both launchers signed; user is told: **2560×1600**, **DirectX 9**, **uncheck Restrict mouse to window**, then OK. Then Patcher Play / login. |
 
-`verify-registration` checks the CrossOver menu/association export without desktop automation and automatically performs one safe `cxbottle --install` repair during installation when needed. `build-launchers` copies `references/icons/AppIcon.icns` into both `.app` bundles and signs them under `~/Applications` by default. The launchers use CrossOver `--wait-children`, set `LSUIElement`, and exit when the requested Windows program exits; they are not resident apps. Do not hand-edit the bundle to “add an icon”; that breaks codesign and can make Play look dead. Do not add LaunchAgents, login items, daemons, or polling loops. Do not use `/Applications/uaRO/` Whisky experiment launchers. No Game.app.
+`verify-registration` checks the CrossOver menu/association export and the CrossOver-native `cxmenu --query` result without desktop automation. When needed, installation performs one safe `cxbottle --install` followed by one `cxmenu --sync --mode install` repair, then verifies again. `build-launchers` copies `references/icons/AppIcon.icns` into both `.app` bundles and signs them under `/Applications` by default; if that directory is not writable, it falls back to `~/Applications` and reports the actual path. The launchers use CrossOver `--wait-children`, set `LSUIElement`, and exit when the requested Windows program exits; they are not resident apps. Do not hand-edit the bundle to “add an icon”; that breaks codesign and can make Play look dead. Do not add LaunchAgents, login items, daemons, or polling loops. Do not use `/Applications/uaRO/` Whisky experiment launchers. No Game.app.
 
 ```zsh
 scripts/uaro-crossover.zsh preflight \
@@ -149,7 +149,8 @@ While uaRO is running, verify the loaded DLL:
 ```zsh
 scripts/uaro-crossover.zsh verify-live-runtime \
   --bottle uaro-crossover --json
-lsof -p "$(pgrep -f 'uaRO.exe' | head -1)" | grep wow64win.dll
+P=$(ps -axo pid=,comm=,args= | python3 scripts/find-uaro-process.py)
+lsof -p "$P" | grep wow64win.dll
 ```
 
 Option A success: `status=pass` and lsof shows CrossOver.app `wow64win.dll` matching `deploy-app`. Clean baseline: `runtime=stock` and `status=pass`. Overlay-only probe PASS is not enough. Dock “Running in Background” on a generated `.app` is not proof the game is running.

@@ -7,7 +7,7 @@ source "$SCRIPT_DIR/lib/crossover-common.zsh"
 BOTTLE_NAME="uaro-crossover"
 GAME_DIR=""
 OVERLAY_DIR=""
-APPLICATIONS_DIR="$HOME/Applications"
+APPLICATIONS_DIR="/Applications"
 REPLACE=0
 OVERLAY_REQUESTED=0
 
@@ -81,6 +81,19 @@ SETUP_PATH="$(find "$GAME_DIR" -type f -iname 'setup.exe' -print -quit 2>/dev/nu
 [[ -n "$PATCHER_PATH" ]] || uo_die "UaRO Patcher.exe was not found below $GAME_DIR"
 [[ -n "$SETUP_PATH" ]] || uo_die "setup.exe was not found below $GAME_DIR"
 
+if [[ ! -d "$APPLICATIONS_DIR" ]]; then
+  mkdir -p "$APPLICATIONS_DIR" 2>/dev/null || true
+fi
+if [[ ! -w "$APPLICATIONS_DIR" ]]; then
+  if [[ "$APPLICATIONS_DIR" == "/Applications" ]]; then
+    uo_warn "cannot write /Applications; falling back to $HOME/Applications"
+    APPLICATIONS_DIR="$HOME/Applications"
+    mkdir -p "$APPLICATIONS_DIR"
+  else
+    uo_die "applications directory is not writable: $APPLICATIONS_DIR"
+  fi
+fi
+
 win_path() {
   python3 - "$BOTTLE_DIR/drive_c" "$1" <<'PY'
 import sys
@@ -147,7 +160,7 @@ LAUNCH_LOG="$LOG_DIR/launcher-$(date +%Y%m%d-%H%M%S).log"
 [[ -d "$GAME_DIR" ]] || { print -u2 -- "uaRO game directory is missing: $GAME_DIR"; exit 1; }
 [[ -x "$WINE_CMD" ]] || { print -u2 -- "CrossOver Wine runtime is missing: $WINE_CMD"; exit 1; }
 cd "$GAME_DIR"
-python3 "$PATCH_SCRIPT" --setup "$SETUP_PATH" --state-file "$STATE_FILE"
+PYTHONDONTWRITEBYTECODE=1 python3 "$PATCH_SCRIPT" --setup "$SETUP_PATH" --state-file "$STATE_FILE"
 print -- "launcher=$0 bottle=$BOTTLE_NAME game_dir=$GAME_DIR wine=$WINE_CMD" | tee "$LAUNCH_LOG"
 CHILD_PID=$$
 python3 - "$STATE_FILE" "$0" "$CHILD_PID" "$LAUNCH_LOG" "$GAME_DIR" "$WINE_CMD" "$RUNTIME_MODE" <<'STATEPY'

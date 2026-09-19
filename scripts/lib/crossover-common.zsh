@@ -133,10 +133,27 @@ uo_state_file() {
   print -- "$HOME/Library/Application Support/uaRO-CrossOver/state.json"
 }
 
+uo_state_writable() {
+  local file="$(uo_state_file)"
+  if [[ -e "$file" ]]; then
+    [[ -w "$file" ]]
+    return
+  fi
+  local parent="${file:h}"
+  while [[ ! -d "$parent" && "$parent" != "/" ]]; do
+    parent="${parent:h}"
+  done
+  [[ -d "$parent" && -w "$parent" ]]
+}
+
 uo_write_state() {
   local state_phase="$1"
   local state_status="$2"
   local file="$(uo_state_file)"
+  if ! uo_state_writable; then
+    uo_warn "state file is not writable; keeping runtime result in command output only: $file"
+    return 0
+  fi
   mkdir -p "${file:h}"
   python3 - "$file" "$state_phase" "$state_status" "${CX_APP:-}" "${CX_VERSION:-}" "${CX_BUILD:-}" "${BOTTLE_NAME:-}" "${GAME_DIR:-}" <<'PY'
 import json
@@ -173,6 +190,10 @@ uo_state_set() {
   local key="$1"
   local value="$2"
   local file="$(uo_state_file)"
+  if ! uo_state_writable; then
+    uo_warn "state file is not writable; skipping state key $key: $file"
+    return 0
+  fi
   mkdir -p "${file:h}"
   python3 - "$file" "$key" "$value" <<'PY'
 import json
@@ -195,6 +216,10 @@ PY
 uo_state_merge_json() {
   local patch_json="$1"
   local file="$(uo_state_file)"
+  if ! uo_state_writable; then
+    uo_warn "state file is not writable; skipping state merge: $file"
+    return 0
+  fi
   mkdir -p "${file:h}"
   python3 - "$file" "$patch_json" <<'PY'
 import json

@@ -8,8 +8,8 @@ Important sections:
 - `setup`: installed `setup.exe`, profile, before/after hashes, backup, and site statuses.
 - `raw_input`: artifact, stock probe, overlay, after probe, and artifact status.
 - `launch`: launcher path, PID, runtime route, live `ntdll.so`/`wow64win.dll` evidence, and log.
-- `registration`: CrossOver `cxbottle.conf`/`cxmenu.conf`/menu plist evidence, exact shortcut and exported command paths, build match, repair attempt, and status.
-- `launchers`: user-level Patcher/Settings paths, runtime route, and signature verification status.
+- `registration`: CrossOver `cxbottle.conf`/`cxmenu.conf`/menu plist evidence, exact shortcut and exported command paths, `cxmenu --query` return code and `CXMenuMacOSX` match count, build match, repair attempt, and status.
+- `launchers`: actual Patcher/Settings Applications directory (normally `/Applications`, with a reported `~/Applications` fallback), runtime route, and signature verification status.
 - `e2e`: user-confirmed Patcher, login, map-load, and T-code observations.
 
 Evidence levels remain separate from command exit codes. In particular, a stock probe may report `AFFECTED=yes` with a non-zero guest exit, while a clean after-probe is not by itself end-to-end proof.

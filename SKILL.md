@@ -1,6 +1,6 @@
 ---
 name: auro-crossover-macos-setup
-version: 0.2.5-experimental
+version: 0.2.6-experimental
 description: >-
   Install, repair, verify, or uninstall uaRO on Apple Silicon macOS using
   CrossOver. Trigger when this GitHub repo or SKILL.md is handed to a fresh
@@ -36,12 +36,14 @@ Do these in order. Do **not** first read every file under `references/`.
    Use its `next_step` as a routing hint, then re-run the owning command and its verification. It never installs, patches, launches, or deletes anything by itself. For a fresh install, run host preflight from the repo root, then the internal Steps 1–12. Keep the technical progress table internally; for a beginner, show only the four-stage summary below. Stop only for: missing files, installer/OpenSetup GUI, macOS permission, login, or the user refusing Option A.
 6. If the user only pasted this SKILL.md without the repo, clone the repo first. The skill cannot run from this file alone.
 
+When reading this file through GitHub's API, quote URLs containing `?` so zsh does not expand them as globs, for example: `gh api 'repos/jirukouya/auRO-crossover-macOS-setup/contents/SKILL.md?ref=main'`.
+
 ## Beginner-facing flow
 
 Present the workflow as four simple stages. The AI performs the technical checks silently and only exposes a blocker or a user action:
 
 1. **Install the game** — prepare CrossOver, create the private bottle, and complete the uaRO installer.
-2. **Create the two launch buttons** — generate Patcher and Settings under `~/Applications`; these are on-demand launchers, not resident apps.
+2. **Create the two launch buttons** — generate Patcher and Settings under `/Applications` so a beginner can find them in Finder's Applications folder; if that folder is not writable, fall back to `~/Applications` and report the actual path. These are on-demand launchers, not resident apps.
 3. **Do first-time Settings** — show the three Settings values, let the user click OK, and close Settings. Do not inspect or guess the user's selections.
 4. **Start and test the game** — open Patcher, log in, enter the map, and run the final runtime check.
 
@@ -158,7 +160,7 @@ Maintain this table in the final report and update it during execution.
 | Step 8 | Stock runtime probe completed | AFFECTED and clobbered *entry count* from probe output |
 | Step 9 | Runtime branch selected | Option A (default), Option B overlay, or clean stock |
 | Step 10 | DLL deployed | Option A: CrossOver.app wow64win.dll hash; Option B: overlay after-probe |
-| Step 11 | CrossOver registration + launchers + Settings SOP | Registration PASS; both user-level launchers signed; Settings instructions shown to the user |
+| Step 11 | CrossOver registration + launchers + Settings SOP | CrossOver menu query PASS; both launchers signed in the reported Applications directory; Settings instructions shown to the user |
 | Step 12 | Live runtime verified | uaRO.exe alive ≥15s; lsof wow64win.dll path/hash; verify-live-runtime status=pass |
 
 Status values:
@@ -262,6 +264,8 @@ Pre-flight must resolve or clearly report:
 - Required tools: zsh, Python 3, CrossOver CLI, file, shasum, and vmmap when live verification is requested.
 - Whether the installer input exists and passes the expected member-name checks.
 - Whether an artifact package is present and can be verified.
+- Whether the user-local state file is writable; if not, report state evidence as `UNCONFIRMED` but continue using direct command output.
+- Whether `CrossOver.app` code signature verifies; an invalid or unavailable signature is `UNCONFIRMED`, and the Skill must not re-sign CrossOver automatically.
 
 After pre-flight, inspect existing state only when the user says an installation or bottle already exists, or when the pre-flight result says the bottle is present:
 
@@ -393,11 +397,11 @@ Before continuing, verify that CrossOver can recognize the installed application
 scripts/uaro-crossover.zsh verify-registration \
   --bottle "$BOTTLE_NAME" \
   --game-dir "$GAME_DIR" \
-  --applications-dir "$HOME/Applications" \
+  --applications-dir /Applications \
   --repair --json
 ~~~
 
-This is a hard gate. A missing `cxmenu.conf` entry, missing CrossOver menu plist, stale bottle/build path, missing Windows shortcut, or missing exported command is `BLOCKED`; do not call the installation complete or proceed by guessing a different bottle. The repair only updates CrossOver menu/association exports and records a log under the uaRO state log directory.
+This is a hard gate. A missing `cxmenu.conf` entry, missing CrossOver menu plist, stale bottle/build path, missing Windows shortcut, missing exported command, failed `cxmenu --query`, or missing `CXMenuMacOSX/` registration is `BLOCKED`; do not call the installation complete or proceed by guessing a different bottle. The repair performs one `cxbottle --install` followed by one `cxmenu --sync --mode install`, then re-runs the read-only checks and records a log under the uaRO state log directory.
 
 ## 8. Phase C — setup patch and game configuration
 
@@ -535,13 +539,13 @@ A failed after-probe blocks launch.
 
 ### Step 11 — Launch Patcher through official CrossOver wine
 
-Do not use `/Applications/uaRO/` Whisky experiment bundles. Build the supported user-level launchers as part of the completion path:
+Do not use `/Applications/uaRO/` Whisky experiment bundles. Build the supported launchers as part of the completion path, preferring the normal Finder Applications folder:
 
 ~~~zsh
 scripts/uaro-crossover.zsh build-launchers --bottle "$BOTTLE_NAME" --game-dir "$GAME_DIR"
 ~~~
 
-By default the bundles are created under `$HOME/Applications`, avoiding an administrator prompt. They are on-demand launchers, not resident apps: they use CrossOver `--wait-children`, exit when Settings/Patcher and their children exit, and set `LSUIElement` so macOS does not present them as ordinary Dock applications. Pass `--applications-dir /Applications` only when the user explicitly wants system-wide apps. `build-launchers` embeds `references/icons/AppIcon.icns` and signs both bundles. Do not add LaunchAgents, login items, daemons, or a polling loop. `repair` audits registration, launcher scripts, signatures, and on-demand lifecycle metadata; it does not prove the game starts.
+By default the bundles are created under `/Applications`; if that directory is not writable, the command falls back to `$HOME/Applications` and prints the actual path. They are on-demand launchers, not resident apps: they use CrossOver `--wait-children`, exit when Settings/Patcher and their children exit, and set `LSUIElement` so macOS does not present them as ordinary Dock applications. `build-launchers` embeds `references/icons/AppIcon.icns` and signs both bundles. Do not add LaunchAgents, login items, daemons, or a polling loop. `repair` audits registration, launcher scripts, signatures, and on-demand lifecycle metadata; it does not prove the game starts.
 
 Re-run the registration check after building launchers:
 
@@ -549,7 +553,7 @@ Re-run the registration check after building launchers:
 scripts/uaro-crossover.zsh verify-registration \
   --bottle "$BOTTLE_NAME" \
   --game-dir "$GAME_DIR" \
-  --applications-dir "$HOME/Applications" \
+  --applications-dir /Applications \
   --json
 ~~~
 
@@ -572,9 +576,11 @@ scripts/uaro-crossover.zsh verify-live-runtime --bottle "$BOTTLE_NAME" --game-di
 and Gate 1 from gepard-crossover-fix:
 
 ~~~zsh
-P=$(pgrep -f 'uaRO.exe' | head -1)
+P=$(ps -axo pid=,comm=,args= | python3 scripts/find-uaro-process.py)
 lsof -p "$P" | grep -o '[^ ]*wow64win.dll' | sort -u
 ~~~
+
+The helper excludes diagnostic shells and only accepts a unique real `uaRO.exe` process. If it finds zero or multiple candidates, the result is `UNCONFIRMED`; pass `--pid` only after confirming the exact process line.
 
 Accepted completion states:
 
@@ -663,7 +669,7 @@ For a user who asks whether an existing installation is working, do not reinstal
 
 ~~~zsh
 scripts/uaro-crossover.zsh bottle status --bottle "$BOTTLE_NAME"
-scripts/uaro-crossover.zsh verify-registration --bottle "$BOTTLE_NAME" --applications-dir "$HOME/Applications" --json
+scripts/uaro-crossover.zsh verify-registration --bottle "$BOTTLE_NAME" --applications-dir /Applications --json
 scripts/uaro-crossover.zsh verify-live-runtime --bottle "$BOTTLE_NAME" --game-dir "$GAME_DIR" --json
 ~~~
 

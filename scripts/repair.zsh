@@ -5,7 +5,7 @@ SCRIPT_DIR="${0:A:h}"
 source "$SCRIPT_DIR/lib/crossover-common.zsh"
 
 BOTTLE_NAME="uaro-crossover"
-APPLICATIONS_DIR="$HOME/Applications"
+APPLICATIONS_DIR="/Applications"
 FIX=0
 
 usage() {
@@ -57,6 +57,7 @@ for display_name in "UaRO CrossOver Patcher" "UaRO CrossOver Settings"; do
     chmod +x "$executable"
     cp "$SCRIPT_DIR/patch-setup.py" "$helper"
     cp "$SCRIPT_DIR/setup_profiles.py" "$profiles"
+    rm -rf "$bundle/Contents/Resources/__pycache__"
     codesign --force --deep --sign - "$bundle" >/dev/null
   fi
   if ! zsh -n "$executable"; then

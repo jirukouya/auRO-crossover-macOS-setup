@@ -44,12 +44,26 @@ if [[ "$(uo_state_get overlay_probe_before 2>/dev/null || true)" == "pass" \
 fi
 
 if [[ -z "$PID" ]]; then
-  while IFS=$' \t' read -r candidate command; do
-    [[ "$candidate" == <-> ]] || continue
-    [[ "$command" == *uaRO.exe* ]] || continue
-    PID="$candidate"
-    break
-  done < <(ps -axo pid=,command=)
+  typeset -a candidates=("${(@f)$(ps -axo pid=,comm=,args= 2>/dev/null | python3 "$SCRIPT_DIR/find-uaro-process.py")}")
+  if (( ${#candidates[@]} == 1 )); then
+    PID="${candidates[1]}"
+  elif (( ${#candidates[@]} > 1 )); then
+    result="$(python3 - "${candidates[@]}" <<'PY'
+import json
+import sys
+print(json.dumps({"process": "ambiguous", "process_candidates": [int(value) for value in sys.argv[1:]], "launch_path": "unknown", "runtime": "unknown", "status": "unconfirmed"}))
+PY
+)"
+    uo_state_merge_json "$(python3 - "$result" <<'PY'
+import json, sys
+print(json.dumps({"launch": {"runtime_check": json.loads(sys.argv[1])}}))
+PY
+)"
+    uo_state_set live_runtime_status unconfirmed
+    uo_write_state runtime unconfirmed
+    (( JSON )) && print -- "$result" || uo_info "INFO: multiple uaRO.exe processes found; runtime route is unconfirmed"
+    exit 0
+  fi
 fi
 
 if [[ -z "$PID" ]]; then
@@ -66,8 +80,35 @@ PY
 fi
 
 [[ "$PID" == <-> ]] || uo_die "invalid PID: $PID"
-vmmap_output="$(mktemp "${TMPDIR:-/tmp}/uaro-vmmap.XXXXXX")"
-trap 'rm -f -- "$vmmap_output"' EXIT INT TERM
+PROCESS_INFO="$(ps -p "$PID" -o pid=,comm=,args= 2>/dev/null || true)"
+[[ -n "$PROCESS_INFO" ]] || uo_die "PID $PID is not running"
+if ! print -- "$PROCESS_INFO" | python3 "$SCRIPT_DIR/find-uaro-process.py" --pid "$PID"; then
+  uo_die "PID $PID is not a uaRO.exe process"
+fi
+PROCESS_AGE_SECONDS="$(ps -p "$PID" -o etime= 2>/dev/null | python3 -c '
+import sys
+value = sys.stdin.read().strip()
+try:
+    days = hours = minutes = seconds = 0
+    if "-" in value:
+        day_text, value = value.split("-", 1)
+        days = int(day_text)
+    parts = [int(part) for part in value.split(":")]
+    if len(parts) == 3:
+        hours, minutes, seconds = parts
+    elif len(parts) == 2:
+        minutes, seconds = parts
+    elif len(parts) == 1:
+        seconds = parts[0]
+    print(days * 86400 + hours * 3600 + minutes * 60 + seconds)
+except (ValueError, TypeError):
+    print("")
+')"
+PROCESS_AGE_PASS=0
+[[ "$PROCESS_AGE_SECONDS" == <-> && "$PROCESS_AGE_SECONDS" -ge 15 ]] && PROCESS_AGE_PASS=1
+VMAP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/uaro-vmmap.XXXXXX")"
+vmmap_output="$VMAP_DIR/vmmap.txt"
+trap 'rm -rf -- "$VMAP_DIR"' EXIT INT TERM
 if ! vmmap "$PID" >"$vmmap_output" 2>&1; then
   uo_warn "vmmap could not inspect PID $PID"
 fi
@@ -138,16 +179,18 @@ elif (( APP_DLL_MATCH )); then
 elif [[ "$runtime" == "stock" || "$runtime" == "mixed" ]]; then
   runtime_status="blocked"
 fi
+(( PROCESS_AGE_PASS )) || [[ "$runtime_status" != "pass" ]] || runtime_status="unconfirmed"
 
-python3 - "$PID" "$launch_path" "$runtime" "$runtime_status" "$wow64_path" "$wow64_hash" "$ntdll_path" "$ntdll_hash" "$expected_hash" "$vmmap_output" <<'PY'
+python3 - "$PID" "$PROCESS_AGE_SECONDS" "$launch_path" "$runtime" "$runtime_status" "$wow64_path" "$wow64_hash" "$ntdll_path" "$ntdll_hash" "$expected_hash" "$vmmap_output" <<'PY'
 import json
 import sys
 from pathlib import Path
 
-pid, launch_path, runtime, status, wow64_path, wow64_hash, ntdll_path, ntdll_hash, expected_hash, vmmap_path = sys.argv[1:]
+pid, age, launch_path, runtime, status, wow64_path, wow64_hash, ntdll_path, ntdll_hash, expected_hash, vmmap_path = sys.argv[1:]
 result = {
     "process": "running",
     "pid": int(pid),
+    "process_age_seconds": int(age) if age.isdigit() else None,
     "launch_path": launch_path,
     "runtime": runtime,
     "status": status,
@@ -158,10 +201,10 @@ result = {
 print(json.dumps(result, indent=2, sort_keys=True))
 PY
 
-RESULT_JSON="$(python3 - "$PID" "$launch_path" "$runtime" "$runtime_status" "$wow64_path" "$wow64_hash" "$ntdll_path" "$ntdll_hash" "$expected_hash" <<'PY'
+RESULT_JSON="$(python3 - "$PID" "$PROCESS_AGE_SECONDS" "$launch_path" "$runtime" "$runtime_status" "$wow64_path" "$wow64_hash" "$ntdll_path" "$ntdll_hash" "$expected_hash" <<'PY'
 import json, sys
-pid, launch_path, runtime, status, wow64_path, wow64_hash, ntdll_path, ntdll_hash, expected_hash = sys.argv[1:]
-print(json.dumps({"process":"running","pid":int(pid),"launch_path":launch_path,"runtime":runtime,"status":status,
+pid, age, launch_path, runtime, status, wow64_path, wow64_hash, ntdll_path, ntdll_hash, expected_hash = sys.argv[1:]
+print(json.dumps({"process":"running","pid":int(pid),"process_age_seconds":int(age) if age.isdigit() else None,"launch_path":launch_path,"runtime":runtime,"status":status,
     "wow64win":{"path":wow64_path,"sha256":wow64_hash,"expected_sha256":expected_hash},
     "ntdll":{"path":ntdll_path,"sha256":ntdll_hash}}))
 PY

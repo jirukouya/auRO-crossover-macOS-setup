@@ -6,7 +6,7 @@ source "$SCRIPT_DIR/lib/crossover-common.zsh"
 
 BOTTLE_NAME="uaro-crossover"
 GAME_DIR=""
-APPLICATIONS_DIR="$HOME/Applications"
+APPLICATIONS_DIR="/Applications"
 REPAIR=0
 JSON=0
 
@@ -31,6 +31,17 @@ uo_resolve_crossover
 uo_require_supported_build
 uo_require_arm64_rosetta
 uo_require_bottle
+CXMENU_QUERY_DIR="$(mktemp -d "${TMPDIR:-/tmp}/uaro-cxmenu-query.XXXXXX")"
+CXMENU_QUERY_FILE="$CXMENU_QUERY_DIR/query.txt"
+trap 'rm -rf -- "$CXMENU_QUERY_DIR"' EXIT INT TERM
+capture_cxmenu_query() {
+  CXMENU_QUERY_RC=0
+  set +e
+  "$CX_ROOT/bin/cxmenu" --bottle "$BOTTLE_NAME" --query >"$CXMENU_QUERY_FILE" 2>&1
+  CXMENU_QUERY_RC=$?
+  set -e
+}
+capture_cxmenu_query
 BOTTLE_STATUS="$($CX_BOTTLE --bottle "$BOTTLE_NAME" --status 2>&1)" || \
   uo_die "CrossOver bottle status query failed: $BOTTLE_NAME"
 [[ "$BOTTLE_STATUS" == *"Status="* ]] || \
@@ -49,6 +60,8 @@ run_check() {
     --crossover-build "$CX_BUILD" \
     --applications-dir "$APPLICATIONS_DIR" \
     --export-root "$HOME/Applications/CrossOver" \
+    --cxmenu-query-file "$CXMENU_QUERY_FILE" \
+    --cxmenu-query-rc "$CXMENU_QUERY_RC" \
     --json
 }
 
@@ -63,13 +76,17 @@ REPAIR_ATTEMPTED=0
 REPAIR_LOG=""
 if (( CHECK_RC != 0 && REPAIR )); then
   REPAIR_ATTEMPTED=1
-  LOG_DIR="$(uo_state_file:h)/logs"
+  STATE_FILE="$(uo_state_file)"
+  LOG_DIR="${STATE_FILE:h}/logs"
   mkdir -p "$LOG_DIR"
   REPAIR_LOG="$LOG_DIR/registration-$(date +%Y%m%d-%H%M%S).log"
   {
     print -- "command=$CX_BOTTLE --bottle $BOTTLE_NAME --install"
     "$CX_BOTTLE" --bottle "$BOTTLE_NAME" --install
+    print -- "command=$CX_ROOT/bin/cxmenu --sync --bottle $BOTTLE_NAME --mode install"
+    "$CX_ROOT/bin/cxmenu" --sync --bottle "$BOTTLE_NAME" --mode install
   } >"$REPAIR_LOG" 2>&1 || true
+  capture_cxmenu_query
   set +e
   CHECK_JSON="$(run_check)"
   CHECK_RC=$?

@@ -17,6 +17,11 @@ usage() {
   print "Usage: overlay.zsh {probe|build|verify} --bottle NAME --artifact-dir DIR [--overlay-dir DIR] [--probe-scope before|after]"
 }
 
+if [[ "$ACTION" == "-h" || "$ACTION" == "--help" || "$ACTION" == "help" ]]; then
+  usage
+  exit 0
+fi
+
 while (( $# )); do
   case "$1" in
     --bottle) BOTTLE_NAME="$2"; shift 2 ;;

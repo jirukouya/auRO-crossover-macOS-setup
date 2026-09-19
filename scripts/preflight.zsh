@@ -52,6 +52,15 @@ BOTTLE_STATUS="missing"
 if [[ -d "$BOTTLE_DIR/drive_c" ]]; then
   BOTTLE_STATUS="present"
 fi
+STATE_FILE_PATH="$(uo_state_file)"
+STATE_STATUS="unconfirmed"
+if uo_state_writable; then
+  STATE_STATUS="pass"
+fi
+CROSSOVER_SIGNATURE_STATUS="unconfirmed"
+if codesign --verify --deep --strict "$CX_APP" >/dev/null 2>&1; then
+  CROSSOVER_SIGNATURE_STATUS="pass"
+fi
 
 INSTALLER_STATUS="missing"
 INSTALLER_TYPE="none"
@@ -99,7 +108,7 @@ fi
 
 if (( JSON_OUTPUT )); then
   python3 - "$BOTTLE_NAME" "$BOTTLE_DIR" "$INSTALLER_SOURCE" "$INSTALLER_TYPE" "$INSTALLER_STATUS" \
-    "$INSTALLER_CACHE_DIR" "$CX_APP" "$CX_VERSION" "$CX_BUILD" "$HOST_ARCH" "$FREE_GIB" "$INSTALLER_REPORT" "$RAWINPUT_SOURCE_DIR" "$RAWINPUT_STATUS" "$RAWINPUT_REPORT" <<'PY'
+    "$INSTALLER_CACHE_DIR" "$CX_APP" "$CX_VERSION" "$CX_BUILD" "$HOST_ARCH" "$FREE_GIB" "$INSTALLER_REPORT" "$RAWINPUT_SOURCE_DIR" "$RAWINPUT_STATUS" "$RAWINPUT_REPORT" "$STATE_FILE_PATH" "$STATE_STATUS" "$CROSSOVER_SIGNATURE_STATUS" <<'PY'
 import json
 import sys
 
@@ -119,6 +128,9 @@ import sys
     rawinput_source,
     rawinput_status,
     rawinput_report,
+    state_file,
+    state_status,
+    crossover_signature_status,
 ) = sys.argv[1:]
 try:
     report = json.loads(installer_report)
@@ -144,6 +156,9 @@ print(json.dumps({
     "rawinput_source_dir": rawinput_source or None,
     "rawinput_status": rawinput_status,
     "rawinput": rawinput,
+    "state_file": state_file,
+    "state_status": state_status,
+    "crossover_signature_status": crossover_signature_status,
 }, indent=2, sort_keys=True))
 PY
 else
@@ -155,6 +170,16 @@ else
   uo_info "INFO: bottle=$BOTTLE_NAME status=$BOTTLE_STATUS path=$BOTTLE_DIR"
   uo_info "INFO: installer=$INSTALLER_STATUS type=$INSTALLER_TYPE source=${INSTALLER_SOURCE:-not supplied}"
   uo_info "INFO: raw-input artifact=${RAWINPUT_STATUS} source=${RAWINPUT_SOURCE_DIR:-not supplied}"
+  if [[ "$STATE_STATUS" == "pass" ]]; then
+    uo_info "PASS: state file is writable: $STATE_FILE_PATH"
+  else
+    uo_warn "state file is not writable; command output remains authoritative: $STATE_FILE_PATH"
+  fi
+  if [[ "$CROSSOVER_SIGNATURE_STATUS" == "pass" ]]; then
+    uo_info "PASS: CrossOver.app code signature verifies"
+  else
+    uo_warn "CrossOver.app code signature is unconfirmed; do not re-sign automatically"
+  fi
   if [[ "$INSTALLER_STATUS" == "complete" ]]; then
     python3 - "$INSTALLER_REPORT" <<'PY'
 import json

@@ -22,6 +22,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--crossover-build", default="")
     parser.add_argument("--applications-dir", type=Path, required=True)
     parser.add_argument("--export-root", type=Path)
+    parser.add_argument("--cxmenu-query-file", type=Path, required=True)
+    parser.add_argument("--cxmenu-query-rc", type=int, default=0)
     parser.add_argument("--json", action="store_true")
     return parser.parse_args()
 
@@ -55,6 +57,20 @@ def unquote(value: str) -> str:
     if len(value) >= 2 and value[0] == value[-1] == '"':
         return value[1:-1]
     return value
+
+
+def query_sections(text: str) -> list[str]:
+    return [section for section in re.split(r"(?=^\[[^\n]+\])", text, flags=re.MULTILINE) if section.lstrip().startswith("[")]
+
+
+def cxmenu_query_matches(text: str) -> tuple[bool, int]:
+    sections = query_sections(text)
+    app_sections = [section for section in sections if APP_NAME in section]
+    matching = [
+        section for section in app_sections
+        if re.search(r"^IDs=.*CXMenuMacOSX/", section, flags=re.MULTILINE)
+    ]
+    return bool(app_sections), len(matching)
 
 
 def shortcut_text(path: Path) -> str:
@@ -147,6 +163,12 @@ def result(args: argparse.Namespace) -> dict:
         require("exported_command_bottle", f'--bottle "{args.bottle}"' in wrapper, "EXPORTED_COMMAND_WRONG_BOTTLE", "exported command points to a different bottle")
         require("exported_command_shortcut", APP_NAME in wrapper, "EXPORTED_COMMAND_WRONG_TARGET", "exported command does not target the uaRO shortcut")
     require("exported_icon", any(path.is_file() for path in icon_paths), "EXPORTED_ICON_MISSING", "CrossOver plist icon path is missing")
+    query_path = args.cxmenu_query_file.expanduser().resolve()
+    query_text = query_path.read_text(encoding="utf-8", errors="replace") if query_path.is_file() else ""
+    query_has_app, query_matching = cxmenu_query_matches(query_text)
+    require("cxmenu_query", args.cxmenu_query_rc == 0 and bool(query_text.strip()), "CXMENU_QUERY_FAILED", "CrossOver cxmenu query could not be completed")
+    require("cxmenu_query_ua_ro", query_has_app, "CXMENU_QUERY_UA_RO_MISSING", "CrossOver cxmenu query has no uaRO menu entry")
+    require("cxmenu_macosx", query_matching > 0, "CXMENU_MACOSX_NOT_REGISTERED", "uaRO menu entry is not registered with CrossOver's CXMenuMacOSX system")
     # CrossOver exports its menu helpers under the user's CrossOver folder,
     # independently of where our optional signed launchers are installed.
     exported_root = (args.export_root or (Path.home() / "Applications/CrossOver")).expanduser().resolve()
@@ -167,6 +189,8 @@ def result(args: argparse.Namespace) -> dict:
         "cxmenu_plist": str(plist_path),
         "shortcut_path": str(shortcut_path) if shortcut_path else "",
         "command_path": str(command_path) if command_path else "",
+        "cxmenu_query_rc": args.cxmenu_query_rc,
+        "cxmenu_query_matches": query_matching,
         "applications_root": str(exported_root),
         "launcher_applications_dir": str(applications_dir),
         "checks": checks,

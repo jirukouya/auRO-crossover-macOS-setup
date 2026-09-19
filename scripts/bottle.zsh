@@ -11,6 +11,11 @@ fi
 BOTTLE_NAME="uaro-crossover"
 CONFIRM=0
 
+if [[ "$ACTION" == "-h" || "$ACTION" == "--help" || "$ACTION" == "help" ]]; then
+  print "Usage: bottle.zsh {create|status|delete} --bottle NAME [--confirm]"
+  exit 0
+fi
+
 while (( $# )); do
   case "$1" in
     --bottle) BOTTLE_NAME="$2"; shift 2 ;;

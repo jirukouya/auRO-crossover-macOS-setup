@@ -87,6 +87,11 @@ if ! has_text 'wait-children|LSUIElement' "$ROOT/scripts/build-launchers.zsh"; t
   exit 1
 fi
 
+if ! has_text 'PYTHONDONTWRITEBYTECODE' "$ROOT/scripts/build-launchers.zsh"; then
+  print -u2 -- "ERROR: launcher must not create unsigned Python __pycache__ resources"
+  exit 1
+fi
+
 if has_text '&!|for \(\(i=0; i<180' "$ROOT/scripts/build-launchers.zsh"; then
   print -u2 -- "ERROR: launchers must not detach Wine or poll as a resident background process"
   exit 1
@@ -101,6 +106,26 @@ done
 
 if ! has_text 'verify-registration|registration' "$ROOT/scripts/uaro-crossover.zsh" "$ROOT/SKILL.md"; then
   print -u2 -- "ERROR: CrossOver registration gate is missing"
+  exit 1
+fi
+
+if ! has_text 'cxmenu --query|CXMenuMacOSX|cxmenu_macosx' "$ROOT/scripts/verify-registration.zsh" "$ROOT/scripts/verify-registration.py" "$ROOT/SKILL.md"; then
+  print -u2 -- "ERROR: CrossOver native menu query hard gate is missing"
+  exit 1
+fi
+
+if ! has_text 'comm=,args=|find-uaro-process' "$ROOT/scripts/verify-live-runtime.zsh"; then
+  print -u2 -- "ERROR: live runtime PID discovery is too broad"
+  exit 1
+fi
+
+if ! has_text 'APPLICATIONS_DIR="/Applications"|/Applications' "$ROOT/scripts/build-launchers.zsh" "$ROOT/scripts/repair.zsh" "$ROOT/SKILL.md"; then
+  print -u2 -- "ERROR: system Applications launcher default is missing"
+  exit 1
+fi
+
+if ! has_text 'CROSSOVER_SIGNATURE_STATUS|state_status|uo_state_writable' "$ROOT/scripts/preflight.zsh" "$ROOT/scripts/lib/crossover-common.zsh"; then
+  print -u2 -- "ERROR: preflight environment evidence is missing"
   exit 1
 fi
 

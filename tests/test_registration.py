@@ -64,6 +64,14 @@ def fixture() -> tuple[tempfile.TemporaryDirectory, SimpleNamespace, dict[str, P
     }
     plist_path = command_dir / "cxmenu_macosx.plist"
     plist_path.write_bytes(plistlib.dumps(plist))
+    query = root / "cxmenu-query.txt"
+    query.write_text(
+        "[StartMenu.C^3A_users_crossover_AppData_Roaming_Microsoft_Windows_Start+Menu/Programs/UaRO World of Your Dream/UaRO World of Your Dream.lnk]\n"
+        "IDs=CXMenuMacOSX/\n"
+        "[Desktop.C^3A_users_crossover_Desktop/UaRO World of Your Dream.lnk]\n"
+        "IDs=CXMenuMacOSX/\n",
+        encoding="utf-8",
+    )
     applications = root / "Applications"
     (applications / "CrossOver").mkdir(parents=True)
     args = SimpleNamespace(
@@ -73,8 +81,10 @@ def fixture() -> tuple[tempfile.TemporaryDirectory, SimpleNamespace, dict[str, P
         crossover_build="26.3.0.39832",
         applications_dir=applications,
         export_root=applications / "CrossOver",
+        cxmenu_query_file=query,
+        cxmenu_query_rc=0,
     )
-    return temp, args, {"bottle": bottle, "game": game, "conf": conf, "plist": plist_path, "command": command, "shortcut": shortcut}
+    return temp, args, {"bottle": bottle, "game": game, "conf": conf, "plist": plist_path, "command": command, "shortcut": shortcut, "query": query}
 
 
 def test_registration_passes_with_complete_export():
@@ -129,10 +139,34 @@ def test_build_drift_is_unconfirmed():
         temp.cleanup()
 
 
+def test_missing_cxmenu_query_is_blocked():
+    temp, args, paths = fixture()
+    try:
+        paths["query"].unlink()
+        report = MODULE.result(args)
+        assert report["status"] == "blocked"
+        assert report["failure_code"] == "CXMENU_QUERY_FAILED"
+    finally:
+        temp.cleanup()
+
+
+def test_cxmenu_macosx_registration_is_required():
+    temp, args, paths = fixture()
+    try:
+        paths["query"].write_text("[StartMenu/UaRO World of Your Dream]\nIDs=CXMenuShortcut/\n", encoding="utf-8")
+        report = MODULE.result(args)
+        assert report["status"] == "blocked"
+        assert report["failure_code"] == "CXMENU_MACOSX_NOT_REGISTERED"
+    finally:
+        temp.cleanup()
+
+
 if __name__ == "__main__":
     test_registration_passes_with_complete_export()
     test_missing_plist_is_blocked()
     test_wrong_bottle_wrapper_is_blocked()
     test_missing_windows_shortcut_is_blocked()
     test_build_drift_is_unconfirmed()
+    test_missing_cxmenu_query_is_blocked()
+    test_cxmenu_macosx_registration_is_required()
     print("PASS: CrossOver registration fixture tests")
