@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Unified the CrossOver runtime policy: Option A is the default only after explicit shared-app confirmation, while Option B uses the current per-bottle overlay `bin/wine` launcher path without claiming a `cxbottle.conf` BinPath/LibPath mutation.
+- Reconciled the recorded 2026-09-06 overlay acceptance and 2026-09-18 Option A startup evidence instead of presenting them as one undifferentiated acceptance run.
+
 - OpenSetup / Settings human gate: default **2560×1600**, **DirectX 9**, and **Restrict mouse to window** unchecked. `configure` writes that resolution and `WindowLock=0`.
 - Add build-matched `artifact fetch`: download the exact GitHub Release ZIP, verify the GitHub asset digest and inner `SHA256SUMS`, safely extract it, import the validated payload, and record Release provenance in state. Manual Discord artifact import is now an explicit fallback only.
 - Harden CrossOver registration with `cxmenu --query` / `CXMenuMacOSX` evidence and one `cxmenu --sync` repair after `cxbottle --install`.

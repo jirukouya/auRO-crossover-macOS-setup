@@ -36,11 +36,11 @@ The workflow keeps the two problems separate and verifies each one independently
 | Problem | Workflow | Required proof |
 |---|---|---|
 | Installer or Settings crash | Apply the hash-locked three-site patch to the installed `setup.exe`, then check Gecko in the selected bottle. | The file hash matches a registered profile and the bottle passes the Gecko gate. |
-| Map-time raw-input / Gepard error | Run the stock probe first. If it is affected, deploy the matching `wow64win.dll` with Option A (replace the DLL inside CrossOver.app after backing up `.orig`). Option B overlay is only if you refuse to edit the app bundle. | Probe after deploy: `AFFECTED=no` and clobbered entries = 0. Live `lsof` on `uaRO.exe` must show the deployed DLL. |
+| Map-time raw-input / Gepard error | Run the stock probe first. If it is affected, use Option A after explicit confirmation (replace the DLL inside CrossOver.app after backing up `.orig`) or choose the per-bottle Option B overlay. | Probe after deploy: `AFFECTED=no` and clobbered entries = 0. Live `lsof` on `uaRO.exe` must show the deployed DLL. |
 | First launch / no game window | Show the user the OpenSetup SOP; the skill does not guess or machine-check their Settings selections. | User is told to use 2560×1600, DirectX 9, and turn off Restrict mouse to window. |
-| Safe launch route | After registration and Option A, launch `UaRo Patcher.exe` with CrossOver `bin/wine --bottle --workdir --wait-children --cx-app`. Generated Patcher/Settings apps are on-demand launchers under `/Applications` by default, with a reported `~/Applications` fallback when needed. No Game.app or resident daemon. | Registration PASS; both launchers signed and on-demand; `uaRO.exe` alive ≥15s; `verify-live-runtime` `status=pass`; lsof path matches deploy-app. |
+| Safe launch route | Option A/clean stock uses CrossOver `bin/wine --bottle --workdir --wait-children --cx-app`; Option B uses the generated launcher paired with overlay `bin/wine`. Patcher/Settings apps are on-demand under `/Applications` by default, with a reported `~/Applications` fallback. No Game.app or resident daemon. | Registration PASS; both launchers signed and on-demand; `uaRO.exe` alive ≥15s; `verify-live-runtime` `status=pass`; lsof path matches the selected runtime. |
 
-This is a Wine compatibility fix, not a Gepard bypass. Wine loads builtin `wow64win.dll` from the directory of the loaded `ntdll.so`. Option A therefore changes `/Applications/CrossOver.app` after a `.orig` backup. Overlay-only copies are ignored if the process still loads stock ntdll.
+This is a Wine compatibility fix, not a Gepard bypass. Wine loads builtin `wow64win.dll` from the directory of the loaded `ntdll.so`. Option A changes `/Applications/CrossOver.app` only after explicit confirmation and a `.orig` backup. The current Option B implementation pairs the copied overlay `ntdll.so` and DLL with the overlay `bin/wine`; do not launch that route through the official wrapper.
 
 CrossOver's desktop app already bundles the interfaces used by this workflow, including its `bin/wine` wrapper and `cxbottle` bottle tool. The Skill discovers the actual app and build on the current Mac instead of assuming a path copied from another machine.
 
@@ -83,7 +83,7 @@ The AI will guide these phases:
 | 4. Raw-input route | Fetches and verifies the exact build-matched Release ZIP, runs the stock probe, then defaults to Option A (`deploy-app`) into CrossOver.app only when affected; overlay is optional. | Only provide a manual matching Discord package if the exact Release is unavailable. |
 | 5. Registration + launchers + SOP | Verify CrossOver menu/association export and `cxmenu --query` without desktop control, build signed on-demand Patcher/Settings apps, show the Settings SOP, then use `launch-patcher`. | Registration PASS; both launchers signed; user is told: **2560×1600**, **DirectX 9**, **uncheck Restrict mouse to window**, then OK. Then Patcher Play / login. |
 
-`verify-registration` checks the CrossOver menu/association export and the CrossOver-native `cxmenu --query` result without desktop automation. When needed, installation performs one safe `cxbottle --install` followed by one `cxmenu --sync --mode install` repair, then verifies again. `build-launchers` refreshes the CrossOver menu export once after creating the bundles, and the follow-up registration check remains mandatory. Preflight prepares the narrow user-local state directory when it is missing. `build-launchers` copies `references/icons/AppIcon.icns` into both `.app` bundles and signs them under `/Applications` by default; if that directory is not writable, it falls back to `~/Applications` and reports the actual path. The launchers use CrossOver `--wait-children`, set `LSUIElement`, and exit when the requested Windows program exits; they are not resident apps. Do not hand-edit the bundle to “add an icon”; that breaks codesign and can make Play look dead. Do not add LaunchAgents, login items, daemons, or polling loops. Do not use `/Applications/uaRO/` Whisky experiment launchers. No Game.app.
+`verify-registration` checks the CrossOver menu/association export and the CrossOver-native `cxmenu --query` result without desktop automation. When needed, installation performs one safe `cxbottle --install` followed by one `cxmenu --sync --mode install` repair, then verifies again. `build-launchers` refreshes the CrossOver menu export once after creating the bundles, and the follow-up registration check remains mandatory. Preflight prepares the narrow user-local state directory when it is missing. `build-launchers` copies `references/icons/AppIcon.icns` into both `.app` bundles and signs them under `/Applications` by default; if that directory is not writable, it falls back to `~/Applications` and reports the actual path. The launchers use the selected CrossOver runtime with `--wait-children`, set `LSUIElement`, and exit when the requested Windows program exits; they are not resident apps. Do not hand-edit the bundle to “add an icon”; that breaks codesign and can make Play look dead. Do not add LaunchAgents, login items, daemons, or polling loops. Do not use `/Applications/uaRO/` Whisky experiment launchers. No Game.app.
 
 ```zsh
 scripts/uaro-crossover.zsh preflight \
@@ -199,17 +199,18 @@ The scoped game level keeps CrossOver and unrelated bottles. The workflow backs 
 
 ## Status
 
-**Experimental, public-facing.** Local static/fixture checks pass. One user-confirmed CrossOver run on Apple Silicon used build `26.3.0.39832`. Other `26.3.0.*` builds are accepted by the scripts if probes pass; they are not separately end-to-end confirmed:
+**Experimental, public-facing.** Local static/fixture checks pass. Recorded runtime evidence comes from Apple Silicon CrossOver build `26.3.0.39832`, with an earlier overlay acceptance and a later Option A startup acceptance. Other `26.3.0.*` builds are accepted by the scripts if probes pass; they are not separately end-to-end confirmed:
 
 - The stock raw-input probe reported `AFFECTED=yes`.
 - The overlay after-probe reported `AFFECTED=no` with zero clobbered entries.
 - The Patcher opened, login succeeded, a map loaded, and the user did not observe `Gepard::T Code: 3::110::12` on the overlay route.
+- The later Option A run kept `uaRO.exe` alive for more than 32 seconds, and `lsof` showed the matching patched `wow64win.dll` inside CrossOver.app; the user confirmed that the game started.
 
 The observed stock count of `238` clobbered entries and the approximately `869 MB` overlay size belong to that machine and run; they are not universal requirements or expected values.
 
 Still **unconfirmed** are long-duration stability, other CrossOver builds, every possible Gepard failure, and trusted provenance for the community prebuilt DLL. This result is not a universal compatibility guarantee.
 
-The core CrossOver installation has one user-confirmed acceptance run. CrossOver AzzyAI installation and in-game auto-attack still require a separate acceptance run; the documented AzzyAI targeting fixes are based on the tested uaRO/Whisky workflow.
+The repository records two separate runtime events rather than one merged claim: an earlier overlay route reached the map with no observed T-code, while the later Option A route confirmed uaRO startup with the CrossOver.app DLL loaded. Map-time T-code absence was not separately re-confirmed on the later Option A run. CrossOver AzzyAI installation and in-game auto-attack still require a separate acceptance run; the documented AzzyAI targeting fixes are based on the tested uaRO/Whisky workflow.
 
 ## Changelog
 

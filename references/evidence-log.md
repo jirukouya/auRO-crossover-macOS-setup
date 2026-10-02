@@ -23,3 +23,11 @@ These facts describe the maintainer machine at the time recorded and are not uni
 - The patched `wow64win.dll` SHA-256 was `c2cc2d3a25b9b74bd2269b209debfbaaaafcf28c40def18ada05993aab80d701`; the overlay was approximately 869 MB.
 - User-confirmed outcome: Patcher opened, login succeeded, character selection succeeded, map loaded, and the T-code was not observed on the overlay route.
 - Long-duration stability, behavior on other CrossOver builds, and whether the DLL resolves every possible Gepard crash remain unconfirmed.
+
+## Latest route acceptance — 2026-09-18
+
+- The earlier 2026-09-06 overlay result remains a separate acceptance event: the recorded route used the generated overlay launcher, passed the after-probe, reached the map, and had no observed T-code.
+- A later run used Option A after backing up the original CrossOver.app DLL. The official CrossOver `bin/wine --bottle --cx-app` probe reported `AFFECTED=no` with clobbered entries `0`.
+- The later Option A launch kept `uaRO.exe` alive for more than 32 seconds, and `lsof` showed the matching patched `wow64win.dll` inside CrossOver.app. The user confirmed that the game started.
+- The later run did not separately reconfirm the absence of the map-time T-code. Do not merge that claim into the Option A startup confirmation.
+- Runtime policy derived from the current implementation: Option A is the default after explicit shared-app confirmation; Option B is the no-shared-app-change fallback using the complete per-bottle overlay and generated overlay `bin/wine`. The current scripts do not write `cxbottle.conf` `BinPath`/`LibPath`.

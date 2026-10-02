@@ -140,7 +140,7 @@ The planner is read-only and only selects the next core uaRO checkpoint (`prefli
 3. Resolve actual CrossOver app path, CLI path, version, bottle path, game path, installer path, and artifact identity from the host.
 4. Treat local files, state JSON, manifests, hashes, build labels, and command output as evidence. Draft history or README claims are not proof of a live result.
 5. Do not collect game credentials. Stop at the account-login, map/login, macOS permission, or administrator prompt and ask the user to act.
-6. After the raw-input DLL is deployed (Option A into CrossOver.app by default), launch `UaRo Patcher.exe` through CrossOver's bundled `bin/wine --bottle --workdir --cx-app`. Do not create or use a direct Game.app launcher. Overlay launchers are Option B only.
+6. After the raw-input route is selected, launch `UaRo Patcher.exe` through the matching runtime: the official CrossOver `bin/wine --bottle --workdir --cx-app` for Option A or clean stock, and the generated launcher with the per-bottle overlay `bin/wine` for Option B. Do not create or use a direct Game.app launcher.
 7. If a required value is unknown, stop that sub-step and label it unconfirmed. Do not guess a fallback.
 
 ## 3. Progress table
@@ -512,7 +512,7 @@ If the baseline is affected, continue to Step 10. Default deployment is Option A
 
 Wine loads builtin `wow64win.dll` from the directory of the `ntdll.so` that was actually loaded. A folder that only contains the replacement DLL is ignored.
 
-**Option A (default, gepard-crossover-fix SHARE-PROMPT):** backup then replace the DLL inside CrossOver.app:
+**Option A (default after explicit user confirmation, gepard-crossover-fix SHARE-PROMPT):** backup then replace the DLL inside CrossOver.app:
 
 ~~~zsh
 scripts/uaro-crossover.zsh deploy-app --artifact-dir "$ARTIFACT_DIR" --bottle "$BOTTLE_NAME" --confirm-app-change
@@ -527,7 +527,7 @@ scripts/uaro-crossover.zsh overlay probe --bottle "$BOTTLE_NAME" --artifact-dir 
 
 After Option A, a probe through `$CX_WINE --bottle --cx-app` must print AFFECTED=no and clobbered entries = 0. Use `overlay probe --probe-scope after` so the state file does not overwrite the stock before-probe result.
 
-**Option B (only if the user refuses to edit CrossOver.app):** build the per-bottle overlay, then set `BinPath`/`LibPath` in `cxbottle.conf` as in the gepard-crossover-fix SKILL. Building overlay files without those bottle keys is not Option B.
+**Option B (only if the user refuses to edit CrossOver.app):** build and verify the complete per-bottle overlay, then let the generated Patcher/Settings launchers use the overlay's `bin/wine`. The current repository does not write `BinPath`/`LibPath` in `cxbottle.conf`; do not launch this route through the official CrossOver wrapper, or the process may load stock `ntdll.so`.
 
 ~~~zsh
 scripts/uaro-crossover.zsh overlay build --bottle "$BOTTLE_NAME" --artifact-dir "$ARTIFACT_DIR"
@@ -537,7 +537,7 @@ scripts/uaro-crossover.zsh overlay verify --bottle "$BOTTLE_NAME" --artifact-dir
 
 A failed after-probe blocks launch.
 
-### Step 11 — Launch Patcher through official CrossOver wine
+### Step 11 — Launch Patcher through the selected CrossOver runtime
 
 Do not use `/Applications/uaRO/` Whisky experiment bundles. Build the supported launchers as part of the completion path, preferring the normal Finder Applications folder:
 
@@ -545,7 +545,7 @@ Do not use `/Applications/uaRO/` Whisky experiment bundles. Build the supported 
 scripts/uaro-crossover.zsh build-launchers --bottle "$BOTTLE_NAME" --game-dir "$GAME_DIR"
 ~~~
 
-By default the bundles are created under `/Applications`; if that directory is not writable, the command falls back to `$HOME/Applications` and prints the actual path. After creating the bundles it refreshes CrossOver's menu export once; the following `verify-registration` command remains the hard gate. They are on-demand launchers, not resident apps: they use CrossOver `--wait-children`, exit when Settings/Patcher and their children exit, and set `LSUIElement` so macOS does not present them as ordinary Dock applications. `build-launchers` embeds `references/icons/AppIcon.icns` and signs both bundles. Do not add LaunchAgents, login items, daemons, or a polling loop. `repair` audits registration, launcher scripts, signatures, and on-demand lifecycle metadata; it does not prove the game starts.
+By default the bundles are created under `/Applications`; if that directory is not writable, the command falls back to `$HOME/Applications` and prints the actual path. After creating the bundles it refreshes CrossOver's menu export once; the following `verify-registration` command remains the hard gate. They are on-demand launchers, not resident apps: they use the selected CrossOver runtime with `--wait-children`, exit when Settings/Patcher and their children exit, and set `LSUIElement` so macOS does not present them as ordinary Dock applications. `build-launchers` embeds `references/icons/AppIcon.icns` and signs both bundles. Do not add LaunchAgents, login items, daemons, or a polling loop. `repair` audits registration, launcher scripts, signatures, and on-demand lifecycle metadata; it does not prove the game starts.
 
 Re-run the registration check after building launchers:
 
@@ -557,13 +557,13 @@ scripts/uaro-crossover.zsh verify-registration \
   --json
 ~~~
 
-Supported launch after Option A:
+Direct launch after Option A or a clean stock baseline:
 
 ~~~zsh
 scripts/uaro-crossover.zsh launch-patcher --bottle "$BOTTLE_NAME" --game-dir "$GAME_DIR"
 ~~~
 
-The executable name is `UaRo Patcher.exe` (not `Patcher.exe`). Working directory must be the game directory. No Game.app. If the client Patcher replaces `setup.exe`, rerun Step 6.
+For Option B, open the generated `UaRO CrossOver Patcher.app`; it embeds the overlay `bin/wine` selected by `build-launchers`. Do not use `launch-patcher` for Option B. The executable name is `UaRo Patcher.exe` (not `Patcher.exe`). Working directory must be the game directory. No Game.app. If the client Patcher replaces `setup.exe`, rerun Step 6.
 
 ### Step 12 — Verify the live runtime
 
@@ -629,7 +629,7 @@ Separate the layers:
 2. Confirm setup.exe patch sites A/B/C.
 3. Confirm the stock probe result.
 4. If affected, confirm Option A app DLL hash or Option B overlay after-probe.
-5. Confirm launch used official CrossOver wine (Option A) or BinPath overlay (Option B).
+5. Confirm launch used official CrossOver wine (Option A/clean stock) or the generated launcher with overlay `bin/wine` (Option B).
 6. Run live verification: uaRO.exe ≥15s and lsof of wow64win.dll.
 
 If Option A is deployed, stock CrossOver.app DLL with the matching hash is success. If lsof still shows the `.orig` stock file, `deploy-app` did not take. If the baseline was clean, a remaining T-code is not proof a DLL overlay is needed.
