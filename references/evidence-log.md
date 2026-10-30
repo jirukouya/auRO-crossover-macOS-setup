@@ -31,3 +31,13 @@ These facts describe the maintainer machine at the time recorded and are not uni
 - The later Option A launch kept `uaRO.exe` alive for more than 32 seconds, and `lsof` showed the matching patched `wow64win.dll` inside CrossOver.app. The user confirmed that the game started.
 - The later run did not separately reconfirm the absence of the map-time T-code. Do not merge that claim into the Option A startup confirmation.
 - Runtime policy derived from the current implementation: Option A is the default after explicit shared-app confirmation; Option B is the no-shared-app-change fallback using the complete per-bottle overlay and generated overlay `bin/wine`. The current scripts do not write `cxbottle.conf` `BinPath`/`LibPath`.
+
+## Option B acceptance run — 2026-10-30
+
+- CrossOver public `26.3`, build `26.3.0.39832`; fresh bottle `uaro-crossover`; build-matched Release `crossover-26.3.0.39832` fetched and verified.
+- Stock probe: `AFFECTED=yes`, devices `2`, clobbered entries `238`. After building the per-bottle overlay: `AFFECTED=no`, clobbered entries `0`.
+- Route: Option B. `/Applications/CrossOver.app` was not modified; Patcher and Settings launchers were generated under `/Applications`. `verify-registration` returned `status=pass`.
+- Live check: `uaRO.exe` had been running 165 seconds (past the ~12-second stock failure point); `verify-live-runtime` returned `status=pass`, `runtime=overlay`, with the overlay `wow64win.dll` SHA-256 `c2cc2d3a25b9b74bd2269b209debfbaaaafcf28c40def18ada05993aab80d701` matching the expected value. The user confirmed they reached the game screen.
+- Not confirmed: long-duration map stability. AzzyAI was not installed.
+- Friction found during this run and fixed afterwards: an iCloud cloud-only (`dataless`) installer ZIP made preflight hang silently; `uo_info` mangled Windows backslashes in log lines; the blocking installer GUI had no documented completion marker.
+

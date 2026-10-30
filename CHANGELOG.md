@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Fail fast (milliseconds, not a silent hang) when the installer ZIP or any directory member is an iCloud cloud-only file; SKILL.md tells the AI to check `ls -lO` for `dataless` while searching for the installer.
+- `uo_info` now uses `print -r`, so Windows paths such as `C:\users\...` are logged intact; `stage-installer.zsh` prints a fixed `WAITING_FOR_USER: installer GUI` marker before the blocking GUI step; preflight announces ZIP verification; SKILL.md documents the blocking `install` command, its completion marker, and typical step durations.
+- Recorded the 2026-10-30 Option B acceptance run (build 26.3.0.39832) in `references/evidence-log.md`.
+
 - Unified the CrossOver runtime policy: Option A is the default only after explicit shared-app confirmation, while Option B uses the current per-bottle overlay `bin/wine` launcher path without claiming a `cxbottle.conf` BinPath/LibPath mutation.
 - Reconciled the recorded 2026-09-06 overlay acceptance and 2026-09-18 Option A startup evidence instead of presenting them as one undifferentiated acceptance run.
 
