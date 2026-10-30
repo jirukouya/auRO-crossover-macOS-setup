@@ -12,7 +12,7 @@ uo_warn() {
 }
 
 uo_info() {
-  print -- "$*"
+  print -r -- "$*"
 }
 
 uo_hash() {

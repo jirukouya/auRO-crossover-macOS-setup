@@ -79,6 +79,7 @@ if [[ -n "$INSTALLER_ZIP" ]]; then
   INSTALLER_ZIP="$(uo_realpath "$INSTALLER_ZIP")" || uo_die "installer ZIP does not exist: $INSTALLER_ZIP"
   INSTALLER_TYPE="zip"
   INSTALLER_SOURCE="$INSTALLER_ZIP"
+  uo_info "INFO: verifying installer ZIP (large; about 30 seconds for 4-5 GB on local SSD)" >&2
   if INSTALLER_REPORT="$(python3 "$SCRIPT_DIR/verify-installer.py" --zip "$INSTALLER_ZIP")"; then
     INSTALLER_STATUS="complete"
   else
