@@ -29,7 +29,7 @@ Do these in order. Do **not** first read every file under `references/`.
    - uaRO installer: `UaRO_Setup.exe` + `UaRO_Setup-1.bin` + `UaRO_Setup-2.bin` (zip or folder)
    - Internet access to the repository's public, build-matched raw-input Release. The Skill downloads this package automatically; do not ask the user to find or rename a Discord folder unless the matching Release is unavailable.
    - Option A will backup then replace `wow64win.dll` **inside CrossOver.app**
-3. Search this Mac for the installer (`~/Downloads`, `~/Documents`, `~/Games`, Desktop). If it is not found, ask **once** for its path. Do not invent or download the uaRO installer. The raw-input package is fetched from GitHub after the current CrossOver build is resolved.
+3. Search this Mac for the installer (`~/Downloads`, `~/Documents`, `~/Games`, Desktop). Check each candidate with `ls -lO`: a file flagged `dataless` is an iCloud cloud-only copy and is not usable yet — tell the user to right-click it in Finder and choose Download Now (or use a local copy). `verify-installer.py` also fails fast on such files, but check first so the user is not surprised. If it is not found, ask **once** for its path. Do not invent or download the uaRO installer. The raw-input package is fetched from GitHub after the current CrossOver build is resolved.
 4. Defaults unless a matching bottle already exists: `BOTTLE_NAME=uaro-crossover`, `ARTIFACT_DIR=$HOME/Games/UaRO-CrossOver-artifacts`. Do not stall on renaming them.
 5. If the user says “继续安装” or this is an existing/partial install, run the read-only resume planner first:
    `scripts/uaro-crossover.zsh continue --bottle uaro-crossover --json`
@@ -283,6 +283,19 @@ Ask the user to choose when more than one plausible bottle exists. Never choose 
 
 For an existing installation, use state only as a resume hint. If the state says the installer is complete and the recorded `GAME_DIR` still contains the game, skip Steps 3–5. Re-run Step 6 when the recorded setup path or hash no longer matches; re-run Step 7 when Gecko/configuration evidence is absent; re-run Step 8 when the recorded bottle, CrossOver build, artifact, or probe log no longer matches the current machine. Never skip a checkpoint solely because an old state entry says `pass`.
 
+### Typical durations (Apple Silicon, local SSD, 4.6 GB installer)
+
+| Command | Typical time | Quiet while running? |
+|---|---|---|
+| `preflight` (ZIP verification) | ~30 s | yes; prints a one-line INFO first |
+| `artifact fetch` | seconds | no |
+| `bottle create` | under a minute | yes |
+| `install` staging (two large `.bin` parts) | a few minutes | prints a line before each member |
+| `install` GUI | user-paced | blocks until the installer closes |
+| `overlay build` | about a minute | yes |
+
+A command that shows no CPU use for several minutes is not "slow": check the input first (`ls -lO` for `dataless`).
+
 ## 6. Phase A — host and artifact readiness
 
 ### Step 1 — Resolve CrossOver and Rosetta
@@ -380,6 +393,8 @@ For an extracted installer directory, use:
 ~~~zsh
 scripts/uaro-crossover.zsh install --bottle "$BOTTLE_NAME" --installer-dir "$INSTALLER_DIR"
 ~~~
+
+`install` blocks until the installer window closes, so run it in the background (not under a 300-second foreground timeout) and watch its log. It prints `WAITING_FOR_USER: installer GUI` when the window is open and `PASS: uaRO game directory:` when the installer has exited and the game files were found; only the second line means Step 5 is complete.
 
 The user must complete the installer GUI, choose the intended game directory, and handle any CrossOver/macOS permission prompt. The AI must not enter or request game credentials. The Patcher launcher is the later client-update entry point; there is no separate client-update shell command in this repository. If a client update replaces the installed `setup.exe`, rerun Step 6 before live verification.
 

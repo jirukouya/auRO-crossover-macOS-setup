@@ -160,3 +160,16 @@ if has_text 'Game\.app' "$ROOT/scripts/build-launchers.zsh"; then
 fi
 
 print "PASS: shell syntax and CrossOver-only static checks"
+
+if ! has_text '^  print -r -- "\$\*"' "$ROOT/scripts/lib/crossover-common.zsh"; then
+  print -u2 -- "ERROR: uo_info must use print -r so Windows paths keep their backslashes"
+  exit 1
+fi
+if [[ "$(source "$ROOT/scripts/lib/crossover-common.zsh"; uo_info 'C:\users\x')" != 'C:\users\x' ]]; then
+  print -u2 -- "ERROR: uo_info mangled a Windows path"
+  exit 1
+fi
+if ! has_text 'WAITING_FOR_USER' "$ROOT/scripts/stage-installer.zsh"; then
+  print -u2 -- "ERROR: installer GUI wait marker is missing"
+  exit 1
+fi

@@ -126,6 +126,7 @@ uo_write_state installer staged
 
 if (( RUN_INSTALLER )); then
   uo_info "Opening the interactive uaRO installer in CrossOver. Complete only the user-level/default installation choices."
+  uo_info "WAITING_FOR_USER: installer GUI (this command blocks until the installer window closes; run it in the background and watch for \"PASS: uaRO game directory:\")"
   uo_info "Human gate: choose current-user installation, keep the default destination, and uncheck automatic game launch on the final page."
   if command -v open >/dev/null 2>&1; then
     open -a "$CX_APP" >/dev/null 2>&1 || uo_warn "CrossOver could not be brought to the foreground; check it with Cmd-Tab"
