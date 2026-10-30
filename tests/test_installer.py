@@ -64,5 +64,34 @@ with tempfile.TemporaryDirectory() as temporary:
     failure = run(corrupt, expect=1)
     assert "compressed-data test failed" in failure.stderr
 
+    # iCloud cloud-only files must fail fast without being read.
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("verify_installer", SCRIPT)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    assert module.is_dataless(valid) is False
+    real_stat = module.os.stat
+
+    class Cloudy:
+        def __init__(self, inner):
+            self._inner = inner
+            self.st_flags = inner.st_flags | module.SF_DATALESS
+
+        def __getattr__(self, name):
+            return getattr(self._inner, name)
+
+    module.os.stat = lambda path, *a, **k: Cloudy(real_stat(path, *a, **k))
+    try:
+        assert module.is_dataless(valid) is True
+        try:
+            module.zip_report(valid)
+        except SystemExit as exc:
+            assert "iCloud cloud-only" in str(exc), exc
+        else:
+            raise AssertionError("dataless ZIP was accepted")
+    finally:
+        module.os.stat = real_stat
+
 print("PASS: installer ZIP fixture tests")
 

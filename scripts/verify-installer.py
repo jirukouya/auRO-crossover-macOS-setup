@@ -6,12 +6,31 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import subprocess
 import sys
 import zipfile
 from pathlib import Path
 
 EXPECTED = ("UaRO_Setup.exe", "UaRO_Setup-1.bin", "UaRO_Setup-2.bin")
+SF_DATALESS = 0x40000000  # macOS: file content lives only in iCloud
+
+
+def is_dataless(path: Path) -> bool:
+    """True for an iCloud cloud-only file. stat does not trigger a download."""
+    try:
+        return bool(getattr(os.stat(path), "st_flags", 0) & SF_DATALESS)
+    except OSError:
+        return False
+
+
+def require_local(path: Path) -> None:
+    if is_dataless(path):
+        fail(
+            f"installer is an iCloud cloud-only file (not downloaded): {path}. "
+            "In Finder, right-click it and choose Download Now, or copy it to "
+            "~/Downloads, then retry"
+        )
 
 
 def sha256_path(path: Path) -> str:
@@ -34,6 +53,7 @@ def directory_report(root: Path) -> dict:
         path = root / name
         if not path.is_file() or path.is_symlink():
             fail(f"required installer member is missing or is a symlink: {path}")
+        require_local(path)
         members.append({
             "name": name,
             "size": path.stat().st_size,
@@ -49,6 +69,7 @@ def directory_report(root: Path) -> dict:
 def zip_report(path: Path) -> dict:
     if not path.is_file() or path.is_symlink():
         fail(f"installer ZIP does not exist or is a symlink: {path}")
+    require_local(path)
     try:
         with zipfile.ZipFile(path) as archive:
             infos = archive.infolist()
